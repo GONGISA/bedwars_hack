@@ -28,11 +28,11 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임
+-- 메인 프레임 (버튼 추가로 높이 확장 370 -> 415)
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 370)
-frame.Position = UDim2.new(0.05, 0, 0.25, 0)
+frame.Size = UDim2.new(0, 220, 0, 415)
+frame.Position = UDim2.new(0.05, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -75,10 +75,11 @@ end
 local espBtn = createButton("ESP", 40)
 local healthBtn = createButton("Health ESP", 85)
 local itemEspBtn = createButton("Item & Armor ESP", 130)
-local sprintBtn = createButton("Auto Sprint", 175)
-local spiderBtn = createButton("Spider", 220)
-local killauraBtn = createButton("KillAura", 265)
-local aimbotBtn = createButton("Aimbot", 310)
+local hitboxBtn = createButton("Hitbox ESP", 175)
+local sprintBtn = createButton("Auto Sprint", 220)
+local spiderBtn = createButton("Spider", 265)
+local killauraBtn = createButton("KillAura", 310)
+local aimbotBtn = createButton("Aimbot", 355)
 
 -- 내 캐릭터 생존 확인 함수
 local function isMyCharAlive()
@@ -147,7 +148,7 @@ espBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 2. 세로 체력바 ESP
+-- 2. 동적 체력바 ESP (거리 & 히트박스 크기 반응)
 -- ========================================================
 local healthActive = false
 
@@ -163,6 +164,8 @@ local function removeAllHealthBars()
 end
 
 local function updateHealthBars()
+    local myHrp = isMyCharAlive() and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
     for _, p in ipairs(Players:GetPlayers()) do
         local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
         
@@ -177,8 +180,6 @@ local function updateHealthBars()
                     gui = Instance.new("BillboardGui")
                     gui.Name = "HealthESP_Gui"
                     gui.Adornee = hrp
-                    gui.Size = UDim2.new(0, 4, 0, 40)
-                    gui.ExtentsOffset = Vector3.new(-2.2, 0.3, 0)
                     gui.AlwaysOnTop = true
                     gui.Parent = hrp
 
@@ -197,6 +198,21 @@ local function updateHealthBars()
                     fill.BorderSizePixel = 0
                     fill.Parent = bg
                 end
+
+                -- 거리 및 히트박스 크기에 맞춰 크기 가변 계산
+                local distScale = 1
+                if myHrp then
+                    local dist = (myHrp.Position - hrp.Position).Magnitude
+                    distScale = math.clamp(85 / math.max(dist, 10), 0.4, 2.5)
+                end
+                
+                -- 히트박스 Y 크기 비율 반영
+                local hitboxYRatio = hrp.Size.Y / 2
+                local barWidth = math.max(3, math.floor(5 * distScale))
+                local barHeight = math.floor(38 * distScale * hitboxYRatio)
+                
+                gui.Size = UDim2.new(0, barWidth, 0, barHeight)
+                gui.ExtentsOffset = Vector3.new(-1.8 * (distScale * math.max(1, hrp.Size.X / 3)), 0, 0)
 
                 local fill = gui.BG:FindFirstChild("Fill")
                 if fill then
@@ -240,16 +256,14 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Item & Armor ESP (무기 및 갑옷 정밀 탐지)
+-- 3. Item & Armor ESP
 -- ========================================================
 local itemEspActive = false
 
--- 플레이어가 들고 있는 무기 감지
 local function getHeldWeapon(p)
     local char = p.Character
     if not char then return "맨손" end
 
-    -- 1. Tool 객체 탐지
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
         local name = string.lower(tool.Name)
@@ -262,7 +276,6 @@ local function getHeldWeapon(p)
         return tool.Name
     end
 
-    -- 2. HandItem Mesh/Accessory 탐지 (베드워즈 특수 연동)
     for _, child in ipairs(char:GetChildren()) do
         local name = string.lower(child.Name)
         if string.find(name, "emerald_sword") then return "에메검" end
@@ -275,7 +288,6 @@ local function getHeldWeapon(p)
     return "맨손"
 end
 
--- 플레이어가 입고 있는 갑옷 감지
 local function getEquippedArmor(p)
     local char = p.Character
     if not char then return "노갑" end
@@ -305,7 +317,6 @@ local function getEquippedArmor(p)
     return highestArmor
 end
 
--- 인벤토리 자원 감지 (보관함 참조 가능 시)
 local function getResources(p)
     local iron, diamond, emerald = 0, 0, 0
     local invs = ReplicatedStorage:FindFirstChild("Inventories")
@@ -405,7 +416,82 @@ itemEspBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 4. Auto Sprint
+-- 4. Hitbox ESP (히트박스 표시 & 확장)
+-- ========================================================
+local hitboxActive = false
+local HITBOX_SIZE = Vector3.new(6, 6, 6)
+
+local function removeAllHitbox()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Size = Vector3.new(2, 2, 1)
+                hrp.Transparency = 1
+                hrp.CanCollide = false
+                if hrp:FindFirstChild("HitboxBox") then
+                    hrp.HitboxBox:Destroy()
+                end
+            end
+        end
+    end
+end
+
+local function updateHitbox()
+    for _, p in ipairs(Players:GetPlayers()) do
+        local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
+        if isEnemy and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+
+            if hrp and hum and hum.Health > 0 then
+                hrp.Size = HITBOX_SIZE
+                hrp.Transparency = 0.75
+                hrp.BrickColor = BrickColor.new("Really red")
+                hrp.Material = Enum.Material.Neon
+                hrp.CanCollide = false
+
+                if not hrp:FindFirstChild("HitboxBox") then
+                    local box = Instance.new("SelectionBox")
+                    box.Name = "HitboxBox"
+                    box.Adornee = hrp
+                    box.Color3 = Color3.fromRGB(255, 60, 60)
+                    box.LineThickness = 0.05
+                    box.Parent = hrp
+                end
+            else
+                if hrp then
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
+                    if hrp:FindFirstChild("HitboxBox") then
+                        hrp.HitboxBox:Destroy()
+                    end
+                end
+            end
+        end
+    end
+end
+
+hitboxBtn.MouseButton1Click:Connect(function()
+    hitboxActive = not hitboxActive
+    if hitboxActive then
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        hitboxBtn.Text = "Hitbox ESP [ON]"
+        task.spawn(function()
+            while hitboxActive do
+                updateHitbox()
+                task.wait(0.2)
+            end
+        end)
+    else
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        hitboxBtn.Text = "Hitbox ESP [OFF]"
+        removeAllHitbox()
+    end
+end)
+
+-- ========================================================
+-- 5. Auto Sprint
 -- ========================================================
 local sprintActive = false
 local sprintConnection = nil
@@ -440,7 +526,7 @@ sprintBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Spider
+-- 6. Spider
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -485,7 +571,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. Bedwars KillAura
+-- 7. Bedwars KillAura
 -- ========================================================
 local killauraActive = false
 local range = 14
@@ -556,7 +642,7 @@ killauraBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 7. 원거리 무기 Aimbot (차징 시간 기반 보정)
+-- 8. Aimbot
 -- ========================================================
 local aimbotActive = false
 local aimbotConnection = nil
@@ -634,7 +720,7 @@ aimbotBtn.MouseButton1Click:Connect(function()
                 local currentSpeed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * chargeRatio
 
                 local targetHead = getClosestEnemy()
-                if targetHead me then
+                if targetHead then
                     local targetPos = calculatePredictedPosition(targetHead.Position, currentSpeed)
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
                 end
@@ -653,4 +739,4 @@ aimbotBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] 베드워즈 전용 Item & Armor ESP 업데이트 완료.")
+print("[RAGON_01] Hitbox ESP 및 거리/크기 가변 Health ESP 적용 완료.")
