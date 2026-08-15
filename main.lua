@@ -28,7 +28,7 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임 (에임봇 버튼 추가로 높이 325로 확장)
+-- 메인 프레임
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
 frame.Size = UDim2.new(0, 220, 0, 325)
@@ -313,10 +313,10 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura
+-- 5. Bedwars KillAura (사거리 14 수정 완료)
 -- ========================================================
 local killauraActive = false
-local range = 35
+local range = 14 -- 기존 35에서 14로 변경
 
 local function getSword()
     local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
@@ -385,19 +385,20 @@ killauraBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. 원거리 무기 Aimbot (우클릭 유지 + 벽/팀 감지)
+-- 6. 원거리 무기 Aimbot (낙차 보정 포함)
 -- ========================================================
 local aimbotActive = false
 local aimbotConnection = nil
 local wallCheckParams = RaycastParams.new()
 wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
 
--- 원거리 무기(활, 석궁, 헤드헌터) 감지
+local PROJECTILE_SPEED = 240
+local GRAVITY = workspace.Gravity
+
 local function isHoldingRangedWeapon()
     local char = LocalPlayer.Character
     if not char then return false end
     
-    -- 손에 든 무기 체크
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
         local name = string.lower(tool.Name)
@@ -406,7 +407,6 @@ local function isHoldingRangedWeapon()
         end
     end
     
-    -- 베드워즈 인벤토리 체크
     local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
     if inv then
         for _, item in ipairs(inv:GetChildren()) do
@@ -419,7 +419,6 @@ local function isHoldingRangedWeapon()
     return false
 end
 
--- 벽 투과 여부 감지 (Raycast)
 local function isVisible(targetHead)
     local origin = Camera.CFrame.Position
     local direction = targetHead.Position - origin
@@ -435,7 +434,6 @@ local function isVisible(targetHead)
     return true
 end
 
--- 가장 가까운 시야 내 상대팀 타겟 검색
 local function getClosestVisibleEnemy()
     local closestHead = nil
     local shortestDist = math.huge
@@ -460,6 +458,15 @@ local function getClosestVisibleEnemy()
     return closestHead
 end
 
+local function calculatePredictedPosition(targetPosition)
+    local camPos = Camera.CFrame.Position
+    local distance = (targetPosition - camPos).Magnitude
+    local timeOfFlight = distance / PROJECTILE_SPEED
+    local dropCompensation = 0.5 * GRAVITY * (timeOfFlight ^ 2)
+    
+    return targetPosition + Vector3.new(0, dropCompensation, 0)
+end
+
 aimbotBtn.MouseButton1Click:Connect(function()
     aimbotActive = not aimbotActive
     if aimbotActive then
@@ -467,11 +474,11 @@ aimbotBtn.MouseButton1Click:Connect(function()
         aimbotBtn.Text = "Aimbot [ON]"
 
         aimbotConnection = RunService.RenderStepped:Connect(function()
-            -- 오른쪽 마우스 버튼(RMB) 누르는 중 & 무기 보유 조건 확인
             if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and isHoldingRangedWeapon() then
                 local targetHead = getClosestVisibleEnemy()
                 if targetHead then
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+                    local targetPos = calculatePredictedPosition(targetHead.Position)
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
                 end
             end
         end)
@@ -485,4 +492,4 @@ aimbotBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] Aimbot 기능 추가 완료.")
+print("[RAGON_01] KillAura 사거리 14로 수정 완료.")
