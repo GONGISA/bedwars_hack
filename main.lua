@@ -26,7 +26,7 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임 (버튼 증가로 높이 310 확장)
+-- 메인 프레임
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
 frame.Size = UDim2.new(0, 220, 0, 280)
@@ -77,7 +77,7 @@ local spiderBtn = createButton("Spider", 175)
 local killauraBtn = createButton("KillAura", 220)
 
 -- ========================================================
--- 1. ESP 기능 (상시 유지 루프)
+-- 1. ESP 기능
 -- ========================================================
 local espActive = false
 
@@ -134,7 +134,7 @@ espBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 2. 세로 체력바 ESP (Health ESP)
+-- 2. 세로 체력바 ESP
 -- ========================================================
 local healthActive = false
 
@@ -151,7 +151,6 @@ end
 
 local function updateHealthBars()
     for _, p in ipairs(Players:GetPlayers()) do
-        -- 상대팀 판정
         local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
         
         if isEnemy and p.Character then
@@ -165,8 +164,8 @@ local function updateHealthBars()
                     gui = Instance.new("BillboardGui")
                     gui.Name = "HealthESP_Gui"
                     gui.Adornee = hrp
-                    gui.Size = UDim2.new(0, 4, 0, 40) -- 세로 슬림 체력바
-                    gui.ExtentsOffset = Vector3.new(-2.2, 0.3, 0) -- 캐릭터 좌측에 위치
+                    gui.Size = UDim2.new(0, 4, 0, 40)
+                    gui.ExtentsOffset = Vector3.new(-2.2, 0.3, 0)
                     gui.AlwaysOnTop = true
                     gui.Parent = hrp
 
@@ -186,12 +185,11 @@ local function updateHealthBars()
                     fill.Parent = bg
                 end
 
-                -- 체력 비율 반영 및 색상 변경 (녹색 -> 노란색 -> 빨간색)
                 local fill = gui.BG:FindFirstChild("Fill")
                 if fill then
                     local healthPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                     fill.Size = UDim2.new(1, 0, healthPct, 0)
-                    fill.Position = UDim2.new(0, 0, 1 - healthPct, 0) -- 아래에서부터 채워짐
+                    fill.Position = UDim2.new(0, 0, 1 - healthPct, 0)
 
                     if healthPct > 0.5 then
                         fill.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
@@ -229,11 +227,11 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Auto Sprint (자동 달리기)
+-- 3. Auto Sprint
 -- ========================================================
 local sprintActive = false
 local sprintConnection = nil
-local SPRINT_SPEED = 22 -- 베드워즈 달리기는 일반적으로 속도 22
+local SPRINT_SPEED = 22
 
 sprintBtn.MouseButton1Click:Connect(function()
     sprintActive = not sprintActive
@@ -260,13 +258,13 @@ sprintBtn.MouseButton1Click:Connect(function()
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = 16 end -- 기본 속도로 복원
+            if hum then hum.WalkSpeed = 16 end
         end
     end
 end)
 
 -- ========================================================
--- 4. Spider (벽타기)
+-- 4. Spider
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -312,7 +310,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura
+-- 5. Bedwars KillAura (공격 속도 극대화 버전)
 -- ========================================================
 local killauraActive = false
 local range = 35
@@ -374,7 +372,7 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.05)
+                task.wait(0.01) -- 대기 시간 0.05초 -> 0.01초로 축소 (초당 약 60회 공격)
             end
         end)
     else
@@ -383,4 +381,4 @@ killauraBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] 기능 추가 완료 (Health ESP & AutoSprint).")
+print("[RAGON_01] KillAura 공격 속도 상향 완료.")
