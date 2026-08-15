@@ -28,7 +28,7 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임 (버튼 추가를 위해 세로 길이 확장)
+-- 메인 프레임
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
 frame.Size = UDim2.new(0, 220, 0, 370)
@@ -74,7 +74,7 @@ end
 
 local espBtn = createButton("ESP", 40)
 local healthBtn = createButton("Health ESP", 85)
-local itemEspBtn = createButton("Item & Resource ESP", 130)
+local itemEspBtn = createButton("Item & Armor ESP", 130)
 local sprintBtn = createButton("Auto Sprint", 175)
 local spiderBtn = createButton("Spider", 220)
 local killauraBtn = createButton("KillAura", 265)
@@ -240,94 +240,86 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Item & Resource ESP (무기, 갑옷, 자원 표시)
+-- 3. Item & Armor ESP (무기 및 갑옷 정밀 탐지)
 -- ========================================================
 local itemEspActive = false
 
-local function getPlayerInv(p)
-    local invs = ReplicatedStorage:FindFirstChild("Inventories")
-    if invs then
-        return invs:FindFirstChild(p.Name)
-    end
-    return nil
-end
-
-local function getPlayerSwordInfo(p)
-    local inv = getPlayerInv(p)
+-- 플레이어가 들고 있는 무기 감지
+local function getHeldWeapon(p)
     local char = p.Character
-    local targets = {char, inv}
+    if not char then return "맨손" end
 
-    local swords = {
-        {"emerald_sword", "에메검"},
-        {"diamond_sword", "다이아검"},
-        {"iron_sword", "철검"},
-        {"stone_sword", "돌검"},
-        {"wood_sword", "나무검"}
-    }
-
-    for _, target in ipairs(targets) do
-        if target then
-            for _, sData in ipairs(swords) do
-                if target:FindFirstChild(sData[1]) then
-                    return sData[2]
-                end
-            end
-        end
+    -- 1. Tool 객체 탐지
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        local name = string.lower(tool.Name)
+        if string.find(name, "emerald_sword") then return "에메검" end
+        if string.find(name, "diamond_sword") then return "다이아검" end
+        if string.find(name, "iron_sword") then return "철검" end
+        if string.find(name, "stone_sword") then return "돌검" end
+        if string.find(name, "wood_sword") then return "나무검" end
+        if string.find(name, "bow") or string.find(name, "crossbow") then return "활/석궁" end
+        return tool.Name
     end
+
+    -- 2. HandItem Mesh/Accessory 탐지 (베드워즈 특수 연동)
+    for _, child in ipairs(char:GetChildren()) do
+        local name = string.lower(child.Name)
+        if string.find(name, "emerald_sword") then return "에메검" end
+        if string.find(name, "diamond_sword") then return "다이아검" end
+        if string.find(name, "iron_sword") then return "철검" end
+        if string.find(name, "stone_sword") then return "돌검" end
+        if string.find(name, "wood_sword") then return "나무검" end
+    end
+
     return "맨손"
 end
 
-local function getPlayerArmorInfo(p)
-    local inv = getPlayerInv(p)
+-- 플레이어가 입고 있는 갑옷 감지
+local function getEquippedArmor(p)
     local char = p.Character
-    local targets = {char, inv}
+    if not char then return "노갑" end
 
-    local armors = {
-        {"emerald", "에메갑"},
-        {"diamond", "다이아갑"},
-        {"iron", "철갑"},
-        {"leather", "가죽갑"}
-    }
+    local highestArmor = "노갑"
+    local armorPriority = { ["노갑"] = 0, ["가죽갑"] = 1, ["철갑"] = 2, ["다이아갑"] = 3, ["에메갑"] = 4 }
 
-    for _, target in ipairs(targets) do
-        if target then
-            for _, child in ipairs(target:GetChildren()) do
-                local name = string.lower(child.Name)
-                for _, aData in ipairs(armors) do
-                    if string.find(name, aData[1]) and (string.find(name, "helmet") or string.find(name, "chestplate") or string.find(name, "boots")) then
-                        return aData[2]
-                    end
-                end
-            end
+    for _, child in ipairs(char:GetDescendants()) do
+        local name = string.lower(child.Name)
+        local detected = nil
+        
+        if string.find(name, "emerald") and (string.find(name, "helmet") or string.find(name, "chest") or string.find(name, "boots") or string.find(name, "armor")) then
+            detected = "에메갑"
+        elseif string.find(name, "diamond") and (string.find(name, "helmet") or string.find(name, "chest") or string.find(name, "boots") or string.find(name, "armor")) then
+            detected = "다이아갑"
+        elseif string.find(name, "iron") and (string.find(name, "helmet") or string.find(name, "chest") or string.find(name, "boots") or string.find(name, "armor")) then
+            detected = "철갑"
+        elseif string.find(name, "leather") and (string.find(name, "helmet") or string.find(name, "chest") or string.find(name, "boots") or string.find(name, "armor")) then
+            detected = "가죽갑"
+        end
+
+        if detected and armorPriority[detected] > armorPriority[highestArmor] then
+            highestArmor = detected
         end
     end
-    return "노갑"
+
+    return highestArmor
 end
 
-local function getPlayerResources(p)
+-- 인벤토리 자원 감지 (보관함 참조 가능 시)
+local function getResources(p)
     local iron, diamond, emerald = 0, 0, 0
-    local inv = getPlayerInv(p)
-    
-    if inv then
-        for _, item in ipairs(inv:GetChildren()) do
-            local name = string.lower(item.Name)
-            local amount = 1
-            
-            local amtObj = item:FindFirstChild("Amount") or item:FindFirstChild("Quantity") or item:FindFirstChild("Count")
-            if amtObj and amtObj:IsA("ValueBase") then
-                amount = amtObj.Value
-            elseif item:GetAttribute("Amount") then
-                amount = item:GetAttribute("Amount")
-            elseif item:IsA("IntValue") or item:IsA("NumberValue") then
-                amount = item.Value
-            end
+    local invs = ReplicatedStorage:FindFirstChild("Inventories")
+    if invs then
+        local inv = invs:FindFirstChild(p.Name)
+        if inv then
+            for _, item in ipairs(inv:GetChildren()) do
+                local name = string.lower(item.Name)
+                local amt = item:FindFirstChild("Amount") or item:FindFirstChild("Quantity")
+                local count = (amt and amt.Value) or item:GetAttribute("Amount") or 1
 
-            if string.find(name, "iron") then
-                iron = iron + amount
-            elseif string.find(name, "diamond") then
-                diamond = diamond + amount
-            elseif string.find(name, "emerald") then
-                emerald = emerald + amount
+                if string.find(name, "iron") then iron = iron + count
+                elseif string.find(name, "diamond") then diamond = diamond + count
+                elseif string.find(name, "emerald") then emerald = emerald + count end
             end
         end
     end
@@ -379,11 +371,11 @@ local function updateItemESP()
 
                 local label = gui:FindFirstChild("InfoLabel")
                 if label then
-                    local sword = getPlayerSwordInfo(p)
-                    local armor = getPlayerArmorInfo(p)
-                    local iron, dia, eme = getPlayerResources(p)
+                    local weapon = getHeldWeapon(p)
+                    local armor = getEquippedArmor(p)
+                    local iron, dia, eme = getResources(p)
                     
-                    label.Text = string.format("[%s | %s]\n⚪ %d | 🔷 %d | 🟩 %d", sword, armor, iron, dia, eme)
+                    label.Text = string.format("[%s | %s]\n⚪ %d | 🔷 %d | 🟩 %d", weapon, armor, iron, dia, eme)
                 end
             else
                 if head and head:FindFirstChild("ItemESP_Gui") then
@@ -402,7 +394,7 @@ itemEspBtn.MouseButton1Click:Connect(function()
         task.spawn(function()
             while itemEspActive do
                 updateItemESP()
-                task.wait(0.3)
+                task.wait(0.25)
             end
         end)
     else
@@ -493,7 +485,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. Bedwars KillAura (사거리 14)
+-- 6. Bedwars KillAura
 -- ========================================================
 local killauraActive = false
 local range = 14
@@ -642,7 +634,7 @@ aimbotBtn.MouseButton1Click:Connect(function()
                 local currentSpeed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * chargeRatio
 
                 local targetHead = getClosestEnemy()
-                if targetHead then
+                if targetHead me then
                     local targetPos = calculatePredictedPosition(targetHead.Position, currentSpeed)
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
                 end
@@ -661,4 +653,4 @@ aimbotBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] Item & Resource ESP 추가 완료.")
+print("[RAGON_01] 베드워즈 전용 Item & Armor ESP 업데이트 완료.")
