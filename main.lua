@@ -1,7 +1,9 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 -- 디스코드 링크 클립보드 복사
 pcall(function()
@@ -26,10 +28,10 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임
+-- 메인 프레임 (에임봇 버튼 추가로 높이 325로 확장)
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 280)
+frame.Size = UDim2.new(0, 220, 0, 325)
 frame.Position = UDim2.new(0.05, 0, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 frame.BorderSizePixel = 0
@@ -75,6 +77,7 @@ local healthBtn = createButton("Health ESP", 85)
 local sprintBtn = createButton("Auto Sprint", 130)
 local spiderBtn = createButton("Spider", 175)
 local killauraBtn = createButton("KillAura", 220)
+local aimbotBtn = createButton("Aimbot", 265)
 
 -- ========================================================
 -- 1. ESP 기능
@@ -310,7 +313,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura (0.04초 딜레이 버전)
+-- 5. Bedwars KillAura
 -- ========================================================
 local killauraActive = false
 local range = 35
@@ -372,7 +375,7 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.04) -- 대기 시간을 0.04초로 설정
+                task.wait(0.04)
             end
         end)
     else
@@ -381,4 +384,105 @@ killauraBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] KillAura 공격 속도 0.04초 설정 완료.")
+-- ========================================================
+-- 6. 원거리 무기 Aimbot (우클릭 유지 + 벽/팀 감지)
+-- ========================================================
+local aimbotActive = false
+local aimbotConnection = nil
+local wallCheckParams = RaycastParams.new()
+wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- 원거리 무기(활, 석궁, 헤드헌터) 감지
+local function isHoldingRangedWeapon()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    -- 손에 든 무기 체크
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        local name = string.lower(tool.Name)
+        if string.find(name, "bow") or string.find(name, "crossbow") or string.find(name, "headhunter") then
+            return true
+        end
+    end
+    
+    -- 베드워즈 인벤토리 체크
+    local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
+    if inv then
+        for _, item in ipairs(inv:GetChildren()) do
+            local name = string.lower(item.Name)
+            if string.find(name, "bow") or string.find(name, "crossbow") or string.find(name, "headhunter") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- 벽 투과 여부 감지 (Raycast)
+local function isVisible(targetHead)
+    local origin = Camera.CFrame.Position
+    local direction = targetHead.Position - origin
+    
+    if LocalPlayer.Character then
+        wallCheckParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    end
+
+    local rayResult = workspace:Raycast(origin, direction, wallCheckParams)
+    if rayResult then
+        return rayResult.Instance:IsDescendantOf(targetHead.Parent)
+    end
+    return true
+end
+
+-- 가장 가까운 시야 내 상대팀 타겟 검색
+local function getClosestVisibleEnemy()
+    local closestHead = nil
+    local shortestDist = math.huge
+    local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHrp then return nil end
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
+        if isEnemy and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+
+            if head and hum and hum.Health > 0 then
+                local distance = (myHrp.Position - head.Position).Magnitude
+                if distance < shortestDist and isVisible(head) then
+                    shortestDist = distance
+                    closestHead = head
+                end
+            end
+        end
+    end
+    return closestHead
+end
+
+aimbotBtn.MouseButton1Click:Connect(function()
+    aimbotActive = not aimbotActive
+    if aimbotActive then
+        aimbotBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        aimbotBtn.Text = "Aimbot [ON]"
+
+        aimbotConnection = RunService.RenderStepped:Connect(function()
+            -- 오른쪽 마우스 버튼(RMB) 누르는 중 & 무기 보유 조건 확인
+            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and isHoldingRangedWeapon() then
+                local targetHead = getClosestVisibleEnemy()
+                if targetHead then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+                end
+            end
+        end)
+    else
+        aimbotBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        aimbotBtn.Text = "Aimbot [OFF]"
+        if aimbotConnection then
+            aimbotConnection:Disconnect()
+            aimbotConnection = nil
+        end
+    end
+end)
+
+print("[RAGON_01] Aimbot 기능 추가 완료.")
