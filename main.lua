@@ -26,10 +26,10 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임
+-- 메인 프레임 (버튼 증가로 높이 310 확장)
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 240)
+frame.Size = UDim2.new(0, 220, 0, 280)
 frame.Position = UDim2.new(0.05, 0, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 frame.BorderSizePixel = 0
@@ -43,7 +43,7 @@ corner.Parent = frame
 
 -- 타이틀
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundTransparency = 1
 title.Text = "RAGON_01"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -54,12 +54,12 @@ title.Parent = frame
 -- 버튼 생성 함수
 local function createButton(name, posY)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.85, 0, 0, 40)
+    btn.Size = UDim2.new(0.85, 0, 0, 36)
     btn.Position = UDim2.new(0.075, 0, 0, posY)
     btn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
     btn.Text = name .. " [OFF]"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 14
+    btn.TextSize = 13
     btn.Font = Enum.Font.SourceSansSemibold
     btn.Parent = frame
 
@@ -70,12 +70,14 @@ local function createButton(name, posY)
     return btn
 end
 
-local espBtn = createButton("ESP", 50)
-local spiderBtn = createButton("Spider", 100)
-local killauraBtn = createButton("KillAura", 150)
+local espBtn = createButton("ESP", 40)
+local healthBtn = createButton("Health ESP", 85)
+local sprintBtn = createButton("Auto Sprint", 130)
+local spiderBtn = createButton("Spider", 175)
+local killauraBtn = createButton("KillAura", 220)
 
 -- ========================================================
--- 1. ESP 기능 (상시 유지 루프 적용 - 피격/부활 시 자동 재적용)
+-- 1. ESP 기능 (상시 유지 루프)
 -- ========================================================
 local espActive = false
 
@@ -94,7 +96,6 @@ local function updateESP()
             local hum = char:FindFirstChildOfClass("Humanoid")
             
             if hum and hum.Health > 0 then
-                -- Highlight가 없으면 생성 (피격이나 데미지 효과로 지워져도 0.2초 내로 자동 재생성)
                 if not char:FindFirstChild("TestESP") then
                     local hl = Instance.new("Highlight")
                     hl.Name = "TestESP"
@@ -119,8 +120,6 @@ espBtn.MouseButton1Click:Connect(function()
     if espActive then
         espBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
         espBtn.Text = "ESP [ON]"
-        
-        -- ESP 지속 유지 루프 실행
         task.spawn(function()
             while espActive do
                 updateESP()
@@ -135,7 +134,139 @@ espBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 2. Spider (벽타기)
+-- 2. 세로 체력바 ESP (Health ESP)
+-- ========================================================
+local healthActive = false
+
+local function removeAllHealthBars()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp:FindFirstChild("HealthESP_Gui") then
+                hrp.HealthESP_Gui:Destroy()
+            end
+        end
+    end
+end
+
+local function updateHealthBars()
+    for _, p in ipairs(Players:GetPlayers()) do
+        -- 상대팀 판정
+        local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
+        
+        if isEnemy and p.Character then
+            local char = p.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+
+            if hrp and hum and hum.Health > 0 then
+                local gui = hrp:FindFirstChild("HealthESP_Gui")
+                if not gui then
+                    gui = Instance.new("BillboardGui")
+                    gui.Name = "HealthESP_Gui"
+                    gui.Adornee = hrp
+                    gui.Size = UDim2.new(0, 4, 0, 40) -- 세로 슬림 체력바
+                    gui.ExtentsOffset = Vector3.new(-2.2, 0.3, 0) -- 캐릭터 좌측에 위치
+                    gui.AlwaysOnTop = true
+                    gui.Parent = hrp
+
+                    local bg = Instance.new("Frame")
+                    bg.Name = "BG"
+                    bg.Size = UDim2.new(1, 0, 1, 0)
+                    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                    bg.BorderSizePixel = 1
+                    bg.BorderColor3 = Color3.fromRGB(0, 0, 0)
+                    bg.Parent = gui
+
+                    local fill = Instance.new("Frame")
+                    fill.Name = "Fill"
+                    fill.Size = UDim2.new(1, 0, 1, 0)
+                    fill.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+                    fill.BorderSizePixel = 0
+                    fill.Parent = bg
+                end
+
+                -- 체력 비율 반영 및 색상 변경 (녹색 -> 노란색 -> 빨간색)
+                local fill = gui.BG:FindFirstChild("Fill")
+                if fill then
+                    local healthPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    fill.Size = UDim2.new(1, 0, healthPct, 0)
+                    fill.Position = UDim2.new(0, 0, 1 - healthPct, 0) -- 아래에서부터 채워짐
+
+                    if healthPct > 0.5 then
+                        fill.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+                    elseif healthPct > 0.25 then
+                        fill.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+                    else
+                        fill.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+                    end
+                end
+            else
+                if hrp and hrp:FindFirstChild("HealthESP_Gui") then
+                    hrp.HealthESP_Gui:Destroy()
+                end
+            end
+        end
+    end
+end
+
+healthBtn.MouseButton1Click:Connect(function()
+    healthActive = not healthActive
+    if healthActive then
+        healthBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        healthBtn.Text = "Health ESP [ON]"
+        task.spawn(function()
+            while healthActive do
+                updateHealthBars()
+                task.wait(0.1)
+            end
+        end)
+    else
+        healthBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        healthBtn.Text = "Health ESP [OFF]"
+        removeAllHealthBars()
+    end
+end)
+
+-- ========================================================
+-- 3. Auto Sprint (자동 달리기)
+-- ========================================================
+local sprintActive = false
+local sprintConnection = nil
+local SPRINT_SPEED = 22 -- 베드워즈 달리기는 일반적으로 속도 22
+
+sprintBtn.MouseButton1Click:Connect(function()
+    sprintActive = not sprintActive
+    if sprintActive then
+        sprintBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        sprintBtn.Text = "Auto Sprint [ON]"
+        
+        sprintConnection = RunService.RenderStepped:Connect(function()
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.WalkSpeed < SPRINT_SPEED then
+                    hum.WalkSpeed = SPRINT_SPEED
+                end
+            end
+        end)
+    else
+        sprintBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        sprintBtn.Text = "Auto Sprint [OFF]"
+        if sprintConnection then
+            sprintConnection:Disconnect()
+            sprintConnection = nil
+        end
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 16 end -- 기본 속도로 복원
+        end
+    end
+end)
+
+-- ========================================================
+-- 4. Spider (벽타기)
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -181,10 +312,10 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Bedwars KillAura (사거리 35 상향 확장)
+-- 5. Bedwars KillAura
 -- ========================================================
 local killauraActive = false
-local range = 35 -- 사거리 20 -> 35 확장
+local range = 35
 
 local function getSword()
     local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
@@ -252,4 +383,4 @@ killauraBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] 업데이트 완료.")
+print("[RAGON_01] 기능 추가 완료 (Health ESP & AutoSprint).")
