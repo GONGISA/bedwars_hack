@@ -25,14 +25,14 @@ end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RAGON_01_UI"
-screenGui.ResetOnSpawn = false -- 리스폰 시 UI 유지
+screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임
+-- 메인 프레임 (버튼 추가를 위해 세로 길이 확장)
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 325)
-frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+frame.Size = UDim2.new(0, 220, 0, 370)
+frame.Position = UDim2.new(0.05, 0, 0.25, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -74,10 +74,11 @@ end
 
 local espBtn = createButton("ESP", 40)
 local healthBtn = createButton("Health ESP", 85)
-local sprintBtn = createButton("Auto Sprint", 130)
-local spiderBtn = createButton("Spider", 175)
-local killauraBtn = createButton("KillAura", 220)
-local aimbotBtn = createButton("Aimbot", 265)
+local itemEspBtn = createButton("Item & Resource ESP", 130)
+local sprintBtn = createButton("Auto Sprint", 175)
+local spiderBtn = createButton("Spider", 220)
+local killauraBtn = createButton("KillAura", 265)
+local aimbotBtn = createButton("Aimbot", 310)
 
 -- 내 캐릭터 생존 확인 함수
 local function isMyCharAlive()
@@ -239,7 +240,180 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Auto Sprint
+-- 3. Item & Resource ESP (무기, 갑옷, 자원 표시)
+-- ========================================================
+local itemEspActive = false
+
+local function getPlayerInv(p)
+    local invs = ReplicatedStorage:FindFirstChild("Inventories")
+    if invs then
+        return invs:FindFirstChild(p.Name)
+    end
+    return nil
+end
+
+local function getPlayerSwordInfo(p)
+    local inv = getPlayerInv(p)
+    local char = p.Character
+    local targets = {char, inv}
+
+    local swords = {
+        {"emerald_sword", "에메검"},
+        {"diamond_sword", "다이아검"},
+        {"iron_sword", "철검"},
+        {"stone_sword", "돌검"},
+        {"wood_sword", "나무검"}
+    }
+
+    for _, target in ipairs(targets) do
+        if target then
+            for _, sData in ipairs(swords) do
+                if target:FindFirstChild(sData[1]) then
+                    return sData[2]
+                end
+            end
+        end
+    end
+    return "맨손"
+end
+
+local function getPlayerArmorInfo(p)
+    local inv = getPlayerInv(p)
+    local char = p.Character
+    local targets = {char, inv}
+
+    local armors = {
+        {"emerald", "에메갑"},
+        {"diamond", "다이아갑"},
+        {"iron", "철갑"},
+        {"leather", "가죽갑"}
+    }
+
+    for _, target in ipairs(targets) do
+        if target then
+            for _, child in ipairs(target:GetChildren()) do
+                local name = string.lower(child.Name)
+                for _, aData in ipairs(armors) do
+                    if string.find(name, aData[1]) and (string.find(name, "helmet") or string.find(name, "chestplate") or string.find(name, "boots")) then
+                        return aData[2]
+                    end
+                end
+            end
+        end
+    end
+    return "노갑"
+end
+
+local function getPlayerResources(p)
+    local iron, diamond, emerald = 0, 0, 0
+    local inv = getPlayerInv(p)
+    
+    if inv then
+        for _, item in ipairs(inv:GetChildren()) do
+            local name = string.lower(item.Name)
+            local amount = 1
+            
+            local amtObj = item:FindFirstChild("Amount") or item:FindFirstChild("Quantity") or item:FindFirstChild("Count")
+            if amtObj and amtObj:IsA("ValueBase") then
+                amount = amtObj.Value
+            elseif item:GetAttribute("Amount") then
+                amount = item:GetAttribute("Amount")
+            elseif item:IsA("IntValue") or item:IsA("NumberValue") then
+                amount = item.Value
+            end
+
+            if string.find(name, "iron") then
+                iron = iron + amount
+            elseif string.find(name, "diamond") then
+                diamond = diamond + amount
+            elseif string.find(name, "emerald") then
+                emerald = emerald + amount
+            end
+        end
+    end
+    return iron, diamond, emerald
+end
+
+local function removeAllItemESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            if head and head:FindFirstChild("ItemESP_Gui") then
+                head.ItemESP_Gui:Destroy()
+            end
+        end
+    end
+end
+
+local function updateItemESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
+        
+        if isEnemy and p.Character then
+            local char = p.Character
+            local head = char:FindFirstChild("Head")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+
+            if head and hum and hum.Health > 0 then
+                local gui = head:FindFirstChild("ItemESP_Gui")
+                if not gui then
+                    gui = Instance.new("BillboardGui")
+                    gui.Name = "ItemESP_Gui"
+                    gui.Adornee = head
+                    gui.Size = UDim2.new(0, 200, 0, 40)
+                    gui.ExtentsOffset = Vector3.new(0, 2.8, 0)
+                    gui.AlwaysOnTop = true
+                    gui.Parent = head
+
+                    local txt = Instance.new("TextLabel")
+                    txt.Name = "InfoLabel"
+                    txt.Size = UDim2.new(1, 0, 1, 0)
+                    txt.BackgroundTransparency = 1
+                    txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    txt.TextSize = 12
+                    txt.Font = Enum.Font.SourceSansBold
+                    txt.TextStrokeTransparency = 0.2
+                    txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    txt.Parent = gui
+                end
+
+                local label = gui:FindFirstChild("InfoLabel")
+                if label then
+                    local sword = getPlayerSwordInfo(p)
+                    local armor = getPlayerArmorInfo(p)
+                    local iron, dia, eme = getPlayerResources(p)
+                    
+                    label.Text = string.format("[%s | %s]\n⚪ %d | 🔷 %d | 🟩 %d", sword, armor, iron, dia, eme)
+                end
+            else
+                if head and head:FindFirstChild("ItemESP_Gui") then
+                    head.ItemESP_Gui:Destroy()
+                end
+            end
+        end
+    end
+end
+
+itemEspBtn.MouseButton1Click:Connect(function()
+    itemEspActive = not itemEspActive
+    if itemEspActive then
+        itemEspBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        itemEspBtn.Text = "Item ESP [ON]"
+        task.spawn(function()
+            while itemEspActive do
+                updateItemESP()
+                task.wait(0.3)
+            end
+        end)
+    else
+        itemEspBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        itemEspBtn.Text = "Item ESP [OFF]"
+        removeAllItemESP()
+    end
+end)
+
+-- ========================================================
+-- 4. Auto Sprint
 -- ========================================================
 local sprintActive = false
 local sprintConnection = nil
@@ -274,7 +448,7 @@ sprintBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 4. Spider
+-- 5. Spider
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -319,7 +493,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura (사망 시 일시 정지 후 리스폰 시 자동 재개)
+-- 6. Bedwars KillAura (사거리 14)
 -- ========================================================
 local killauraActive = false
 local range = 14
@@ -390,20 +564,21 @@ killauraBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. 원거리 무기 Aimbot
+-- 7. 원거리 무기 Aimbot (차징 시간 기반 보정)
 -- ========================================================
 local aimbotActive = false
 local aimbotConnection = nil
-local wallCheckParams = RaycastParams.new()
-wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
+local chargeStart = 0
+local isCharging = false
 
-local PROJECTILE_SPEED = 240
+local MIN_SPEED = 90
+local MAX_SPEED = 280
+local MAX_CHARGE_TIME = 1.0
 local GRAVITY = workspace.Gravity
 
 local function isHoldingRangedWeapon()
     if not isMyCharAlive() then return false end
     local char = LocalPlayer.Character
-    
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
         local name = string.lower(tool.Name)
@@ -411,35 +586,10 @@ local function isHoldingRangedWeapon()
             return true
         end
     end
-    
-    local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
-    if inv then
-        for _, item in ipairs(inv:GetChildren()) do
-            local name = string.lower(item.Name)
-            if string.find(name, "bow") or string.find(name, "crossbow") or string.find(name, "headhunter") then
-                return true
-            end
-        end
-    end
     return false
 end
 
-local function isVisible(targetHead)
-    local origin = Camera.CFrame.Position
-    local direction = targetHead.Position - origin
-    
-    if LocalPlayer.Character then
-        wallCheckParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    end
-
-    local rayResult = workspace:Raycast(origin, direction, wallCheckParams)
-    if rayResult then
-        return rayResult.Instance:IsDescendantOf(targetHead.Parent)
-    end
-    return true
-end
-
-local function getClosestVisibleEnemy()
+local function getClosestEnemy()
     local closestHead = nil
     local shortestDist = math.huge
     if not isMyCharAlive() then return nil end
@@ -453,7 +603,7 @@ local function getClosestVisibleEnemy()
 
             if head and hum and hum.Health > 0 then
                 local distance = (myHrp.Position - head.Position).Magnitude
-                if distance < shortestDist and isVisible(head) then
+                if distance < shortestDist then
                     shortestDist = distance
                     closestHead = head
                 end
@@ -463,10 +613,10 @@ local function getClosestVisibleEnemy()
     return closestHead
 end
 
-local function calculatePredictedPosition(targetPosition)
+local function calculatePredictedPosition(targetPosition, currentSpeed)
     local camPos = Camera.CFrame.Position
     local distance = (targetPosition - camPos).Magnitude
-    local timeOfFlight = distance / PROJECTILE_SPEED
+    local timeOfFlight = distance / currentSpeed
     local dropCompensation = 0.5 * GRAVITY * (timeOfFlight ^ 2)
     
     return targetPosition + Vector3.new(0, dropCompensation, 0)
@@ -479,12 +629,25 @@ aimbotBtn.MouseButton1Click:Connect(function()
         aimbotBtn.Text = "Aimbot [ON]"
 
         aimbotConnection = RunService.RenderStepped:Connect(function()
-            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and isHoldingRangedWeapon() then
-                local targetHead = getClosestVisibleEnemy()
+            local rmbPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+            
+            if rmbPressed and isHoldingRangedWeapon() then
+                if not isCharging then
+                    isCharging = true
+                    chargeStart = tick()
+                end
+
+                local holdTime = math.min(tick() - chargeStart, MAX_CHARGE_TIME)
+                local chargeRatio = holdTime / MAX_CHARGE_TIME
+                local currentSpeed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * chargeRatio
+
+                local targetHead = getClosestEnemy()
                 if targetHead then
-                    local targetPos = calculatePredictedPosition(targetHead.Position)
+                    local targetPos = calculatePredictedPosition(targetHead.Position, currentSpeed)
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
                 end
+            else
+                isCharging = false
             end
         end)
     else
@@ -494,7 +657,8 @@ aimbotBtn.MouseButton1Click:Connect(function()
             aimbotConnection:Disconnect()
             aimbotConnection = nil
         end
+        isCharging = false
     end
 end)
 
-print("[RAGON_01] 리스폰 자동 유지 기능 적용 완료.")
+print("[RAGON_01] Item & Resource ESP 추가 완료.")
