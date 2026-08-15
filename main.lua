@@ -310,7 +310,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura (공격 속도 극대화 버전)
+-- 5. Bedwars KillAura (0.04초 딜레이 버전)
 -- ========================================================
 local killauraActive = false
 local range = 35
@@ -372,7 +372,7 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.01) -- 대기 시간 0.05초 -> 0.01초로 축소 (초당 약 60회 공격)
+                task.wait(0.04) -- 대기 시간을 0.04초로 설정
             end
         end)
     else
@@ -381,4 +381,4 @@ killauraBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] KillAura 공격 속도 상향 완료.")
+print("[RAGON_01] KillAura 공격 속도 0.04초 설정 완료.")
