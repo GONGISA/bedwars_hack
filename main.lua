@@ -3,6 +3,13 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
+-- 디스코드 링크 클립보드 복사 (실행 환경에 따라 지원 안 할 수 있어 pcall 처리)
+pcall(function()
+    if setclipboard then
+        setclipboard('https://discord.gg/VudXCDCaBN')
+    end
+end)
+
 -- UI 생성 (CoreGui 지원 안 될 시 PlayerGui 사용)
 local parentContainer = game:GetService("CoreGui")
 if not pcall(function() local _ = parentContainer.Name end) then
@@ -10,12 +17,12 @@ if not pcall(function() local _ = parentContainer.Name end) then
 end
 
 -- 기존 UI가 있다면 삭제
-if parentContainer:FindFirstChild("SecurityTestUI") then
-    parentContainer.SecurityTestUI:Destroy()
+if parentContainer:FindFirstChild("RAGON_01_UI") then
+    parentContainer.RAGON_01_UI:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SecurityTestUI"
+screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
@@ -34,13 +41,13 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
--- 타이틀
+-- 타이틀 (RAGON_01 로 변경 완료)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundTransparency = 1
-title.Text = "Security Test Panel"
+title.Text = "RAGON_01"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 16
+title.TextSize = 18
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
@@ -164,11 +171,24 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. KillAura (근접 자동 공격 모의) 기능 구현 (Toggle)
+-- 3. Bedwars KillAura (제시해주신 로직 통합)
 -- ========================================================
 local killauraActive = false
-local killauraConnection = nil
-local ATTACK_RANGE = 15 -- 사거리 테스트 (스터드)
+local range = 20
+
+local function getSword()
+    local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
+    if not inv then return nil end
+    return inv:FindFirstChild("wood_sword") or
+           inv:FindFirstChild("stone_sword") or
+           inv:FindFirstChild("iron_sword") or
+           inv:FindFirstChild("diamond_sword") or
+           inv:FindFirstChild("emerald_sword")
+end
+
+local function dist(p1, p2)
+    return (p1 - p2).Magnitude
+end
 
 killauraBtn.MouseButton1Click:Connect(function()
     killauraActive = not killauraActive
@@ -176,36 +196,52 @@ killauraBtn.MouseButton1Click:Connect(function()
         killauraBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
         killauraBtn.Text = "KillAura [ON]"
 
-        killauraConnection = RunService.RenderStepped:Connect(function()
-            local myChar = LocalPlayer.Character
-            if not myChar then return end
-            local myHrp = myChar:FindFirstChild("HumanoidRootPart")
-            if not myHrp then return end
+        -- 루프 동작 (토글이 켜져 있을 때만 작동)
+        task.spawn(function()
+            while killauraActive do
+                local sword = getSword()
+                local net = ReplicatedStorage.rbxts_include.node_modules:FindFirstChild("@rbxts")
+                if net then
+                    net = net.net.out._NetManaged:FindFirstChild("SwordHit")
+                end
 
-            -- 주변 15스터드 내 플레이어 검색
-            for _, target in ipairs(Players:GetPlayers()) do
-                if target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    local targetHrp = target.Character.HumanoidRootPart
-                    local dist = (myHrp.Position - targetHrp.Position).Magnitude
-
-                    if dist <= ATTACK_RANGE then
-                        -- 게임 내 공격 리모트 이벤트명을 넣어서 검증
-                        local attackRemote = ReplicatedStorage:FindFirstChild("AttackRemote")
-                        if attackRemote then
-                            attackRemote:FireServer(target)
+                if sword and net then
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            local pPos = p.Character.HumanoidRootPart.Position
+                            local lpPos = LocalPlayer.Character.HumanoidRootPart.Position
+                            
+                            -- 사거리 측정 및 팀 확인
+                            if dist(lpPos, pPos) <= range and p.Team ~= LocalPlayer.Team then
+                                local args = {
+                                    [1] = {
+                                        ["entityInstance"] = p.Character,
+                                        ["chargedAttack"] = {
+                                            ["chargeRatio"] = 0
+                                        },
+                                        ["validate"] = {
+                                            ["targetPosition"] = {
+                                                ["value"] = pPos
+                                            },
+                                            ["selfPosition"] = {
+                                                ["value"] = lpPos
+                                            }
+                                        },
+                                        ["weapon"] = sword
+                                    }
+                                }
+                                net:FireServer(unpack(args))
+                            end
                         end
                     end
                 end
+                task.wait(0.07)
             end
         end)
     else
         killauraBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
         killauraBtn.Text = "KillAura [OFF]"
-        if killauraConnection then
-            killauraConnection:Disconnect()
-            killauraConnection = nil
-        end
     end
 end)
 
-print("[TestPanel] 성공적으로 로드되었습니다.")
+print("[RAGON_01] 패널이 성공적으로 로드되었습니다.")
