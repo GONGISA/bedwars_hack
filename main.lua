@@ -33,7 +33,7 @@ screenGui.Parent = parentContainer
 -- 메인 프레임
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 340, 0, 420)
+frame.Size = UDim2.new(0, 350, 0, 430)
 frame.Position = UDim2.new(0.03, 0, 0.15, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
 frame.BorderSizePixel = 0
@@ -70,8 +70,8 @@ end)
 -- 탭 버튼 바
 local tabBar = Instance.new("Frame")
 tabBar.Name = "TabBar"
-tabBar.Size = UDim2.new(1, -16, 0, 30)
-tabBar.Position = UDim2.new(0, 8, 0, 34)
+tabBar.Size = UDim2.new(1, -12, 0, 30)
+tabBar.Position = UDim2.new(0, 6, 0, 34)
 tabBar.BackgroundTransparency = 1
 tabBar.Parent = frame
 
@@ -80,7 +80,7 @@ tabLayout.Parent = tabBar
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
 tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Padding = UDim.new(0, 4)
+tabLayout.Padding = UDim.new(0, 3)
 
 -- 컨테이너 영역
 local contentArea = Instance.new("Frame")
@@ -96,11 +96,11 @@ local categoryFrames = {}
 local function createTab(tabName, iconText)
     local tabBtn = Instance.new("TextButton")
     tabBtn.Name = tabName .. "Tab"
-    tabBtn.Size = UDim2.new(0.24, -2, 1, 0)
+    tabBtn.Size = UDim2.new(0.19, -1, 1, 0)
     tabBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
     tabBtn.Text = iconText
     tabBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
-    tabBtn.TextSize = 12
+    tabBtn.TextSize = 11
     tabBtn.Font = Enum.Font.SourceSansBold
     tabBtn.Parent = tabBar
 
@@ -147,11 +147,12 @@ local function switchTab(selectedTab)
     end
 end
 
--- 4개 카테고리 탭 생성
-local combatScroll = createTab("Combat", "⚔️ 전투")
-local espScroll    = createTab("ESP", "👁️ ESP")
-local utilScroll   = createTab("Utility", "🛠️ 유틸")
-local optScroll    = createTab("Opt", "⚙️ 시스템")
+-- 5개 카테고리 탭 생성
+local combatScroll   = createTab("Combat", "⚔️전투")
+local espScroll      = createTab("ESP", "👁️ESP")
+local utilScroll     = createTab("Utility", "🛠️유틸")
+local settingsScroll = createTab("Settings", "⚙️설정")
+local optScroll      = createTab("System", "💻시스템")
 
 for name, btn in pairs(tabs) do
     btn.MouseButton1Click:Connect(function() switchTab(name) end)
@@ -160,6 +161,10 @@ end
 switchTab("Combat")
 
 local featureStates = {}
+local settingsState = {
+    killauraRange = 15,
+    killauraDelay = 0.03
+}
 
 local function createButton(parentScroll, keyName, displayName)
     featureStates[keyName] = false
@@ -170,7 +175,7 @@ local function createButton(parentScroll, keyName, displayName)
     btn.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
     btn.Text = displayName .. " [OFF]"
     btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    btn.TextSize = 13
+    btn.TextSize = 12
     btn.Font = Enum.Font.SourceSansSemibold
     btn.Parent = parentScroll
 
@@ -192,12 +197,71 @@ local function setBtnState(btn, active, displayName)
     btn.Text = displayName .. " [" .. (active and "ON" or "OFF") .. "]"
 end
 
+-- 수치 조절 설정 UI 제어용 헬퍼 함수
+local updateSettingUI = {}
+local function createNumberSetting(parentScroll, keyName, displayName, defaultVal, step, minVal, maxVal, unit)
+    settingsState[keyName] = defaultVal
+
+    local container = Instance.new("Frame")
+    container.Name = keyName .. "SettingFrame"
+    container.Size = UDim2.new(1, -6, 0, 36)
+    container.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+    container.Parent = parentScroll
+
+    local cCorner = Instance.new("UICorner") cCorner.CornerRadius = UDim.new(0, 6) cCorner.Parent = container
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.58, 0, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = displayName .. ": " .. tostring(defaultVal) .. (unit or "")
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.SourceSansSemibold
+    label.Parent = container
+
+    local btnMinus = Instance.new("TextButton")
+    btnMinus.Size = UDim2.new(0.18, 0, 0.7, 0)
+    btnMinus.Position = UDim2.new(0.58, 0, 0.15, 0)
+    btnMinus.BackgroundColor3 = Color3.fromRGB(50, 50, 62)
+    btnMinus.Text = "-"
+    btnMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnMinus.Font = Enum.Font.SourceSansBold
+    btnMinus.TextSize = 14
+    btnMinus.Parent = container
+    local mCorner = Instance.new("UICorner") mCorner.CornerRadius = UDim.new(0, 4) mCorner.Parent = btnMinus
+
+    local btnPlus = Instance.new("TextButton")
+    btnPlus.Size = UDim2.new(0.18, 0, 0.7, 0)
+    btnPlus.Position = UDim2.new(0.79, 0, 0.15, 0)
+    btnPlus.BackgroundColor3 = Color3.fromRGB(50, 50, 62)
+    btnPlus.Text = "+"
+    btnPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnPlus.Font = Enum.Font.SourceSansBold
+    btnPlus.TextSize = 14
+    btnPlus.Parent = container
+    local pCorner = Instance.new("UICorner") pCorner.CornerRadius = UDim.new(0, 4) pCorner.Parent = btnPlus
+
+    local function setValue(val)
+        val = math.clamp(math.round(val * 100) / 100, minVal, maxVal)
+        settingsState[keyName] = val
+        label.Text = displayName .. ": " .. tostring(val) .. (unit or "")
+    end
+
+    btnMinus.MouseButton1Click:Connect(function() setValue(settingsState[keyName] - step) end)
+    btnPlus.MouseButton1Click:Connect(function() setValue(settingsState[keyName] + step) end)
+
+    updateSettingUI[keyName] = setValue
+    return setValue
+end
+
 -- 전투 버튼
-local killauraBtn   = createButton(combatScroll, "killaura", "KillAura (사거리 15 / 0.03초)")
+local killauraBtn   = createButton(combatScroll, "killaura", "KillAura (자동 공격)")
 local aimbotBtn     = createButton(combatScroll, "aimbot", "Bow Aimbot (낙사/이동예측)")
 local autoclickBtn  = createButton(combatScroll, "autoclicker", "Auto Clicker (LMB 연타)")
 local autoWeaponBtn = createButton(combatScroll, "autoweapon", "Auto Weapon Switch")
-local reachBtn      = createButton(combatScroll, "reach", "Reach Multiplier (15 Studs)")
+local reachBtn      = createButton(combatScroll, "reach", "Reach Multiplier")
 
 -- ESP 버튼
 local espBtn        = createButton(espScroll, "playeresp", "Player ESP (하이라이트)")
@@ -216,18 +280,22 @@ local noFallBtn     = createButton(utilScroll, "nofall", "No Fall Damage (낙사
 local sprintBtn     = createButton(utilScroll, "sprint", "Auto Sprint (자동 달리기)")
 local spiderBtn     = createButton(utilScroll, "spider", "Spider (벽 타기)")
 
+-- 세부 설정 (Settings 탭)
+createNumberSetting(settingsScroll, "killauraRange", "🎯 KillAura 사거리", 15, 1, 1, 30, " Studs")
+createNumberSetting(settingsScroll, "killauraDelay", "⚡ 공격 속도(딜레이)", 0.03, 0.01, 0.01, 0.50, "s")
+
 -- 시스템 & 최적화 버튼
 local fpsBoostBtn   = createButton(optScroll, "fpsboost", "FPS Boost (렉제거 & 최적화)")
 local staffDetBtn   = createButton(optScroll, "staffdetector", "Staff / Mod Detector (관리자 감지)")
 local autoToxicBtn  = createButton(optScroll, "autotoxic", "Auto Toxic (자동 채팅 도발)")
 
--- 설정 저장 / 불러오기 전용 버튼 (Toggle 형태가 아닌 Action 버튼)
+-- 설정 저장 / 불러오기 전용 버튼
 local saveConfigBtn = Instance.new("TextButton")
 saveConfigBtn.Size = UDim2.new(1, -6, 0, 34)
 saveConfigBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 saveConfigBtn.Text = "💾 설정 저장하기 (Save Config)"
 saveConfigBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveConfigBtn.TextSize = 13
+saveConfigBtn.TextSize = 12
 saveConfigBtn.Font = Enum.Font.SourceSansBold
 saveConfigBtn.Parent = optScroll
 local scCorner = Instance.new("UICorner") scCorner.CornerRadius = UDim.new(0, 6) scCorner.Parent = saveConfigBtn
@@ -237,7 +305,7 @@ loadConfigBtn.Size = UDim2.new(1, -6, 0, 34)
 loadConfigBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 loadConfigBtn.Text = "📂 설정 불러오기 (Load Config)"
 loadConfigBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-loadConfigBtn.TextSize = 13
+loadConfigBtn.TextSize = 12
 loadConfigBtn.Font = Enum.Font.SourceSansBold
 loadConfigBtn.Parent = optScroll
 local lcCorner = Instance.new("UICorner") lcCorner.CornerRadius = UDim.new(0, 6) lcCorner.Parent = loadConfigBtn
@@ -708,8 +776,17 @@ scaffoldBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 7. Bed Nuker
+-- 7. Bed Nuker (자동 침대 파괴기 - 수정완료)
 -- ========================================================
+local function isEnemyBed(part)
+    local myTeamColor = LocalPlayer.Team and LocalPlayer.Team.TeamColor
+    if myTeamColor then
+        if part:FindFirstChild("TeamColor") and part.TeamColor.Value == myTeamColor then return false end
+        if part.Parent and part.Parent:FindFirstChild("TeamColor") and part.Parent.TeamColor.Value == myTeamColor then return false end
+    end
+    return true
+end
+
 bedNukerBtn.MouseButton1Click:Connect(function()
     featureStates.bednuker = not featureStates.bednuker
     setBtnState(bedNukerBtn, featureStates.bednuker, "Bed Nuker (자동 침대 파괴)")
@@ -721,12 +798,16 @@ bedNukerBtn.MouseButton1Click:Connect(function()
                         local myPos = LocalPlayer.Character.HumanoidRootPart.Position
                         for _, obj in ipairs(workspace:GetDescendants()) do
                             if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "bed") and not string.find(string.lower(obj.Name), "bedroom") then
-                                if (obj.Position - myPos).Magnitude <= 16 then
+                                if (obj.Position - myPos).Magnitude <= 20 and isEnemyBed(obj) then
                                     local netManaged = ReplicatedStorage:FindFirstChild("rbxts_include")
                                     if netManaged then
                                         local damageNet = netManaged.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("DamageBlock")
                                         if damageNet then
-                                            local blockPos = Vector3.new(math.floor(obj.Position.X/3), math.floor(obj.Position.Y/3), math.floor(obj.Position.Z/3))
+                                            local blockPos = Vector3.new(
+                                                math.round(obj.Position.X / 3),
+                                                math.round(obj.Position.Y / 3),
+                                                math.round(obj.Position.Z / 3)
+                                            )
                                             damageNet:InvokeServer({
                                                 ["blockRef"] = { ["blockPosition"] = blockPos },
                                                 ["hitPosition"] = obj.Position,
@@ -739,14 +820,14 @@ bedNukerBtn.MouseButton1Click:Connect(function()
                         end
                     end)
                 end
-                task.wait(0.1)
+                task.wait(0.05)
             end
         end)
     end
 end)
 
 -- ========================================================
--- 8. Chest Stealer [신규]
+-- 8. Chest Stealer
 -- ========================================================
 chestStealBtn.MouseButton1Click:Connect(function()
     featureStates.cheststealer = not featureStates.cheststealer
@@ -780,7 +861,7 @@ chestStealBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 9. Blink / Lag Switch [신규]
+-- 9. Blink / Lag Switch
 -- ========================================================
 local blinkClone = nil
 blinkBtn.MouseButton1Click:Connect(function()
@@ -823,7 +904,9 @@ autoWeaponBtn.MouseButton1Click:Connect(function()
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= LocalPlayer and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
                         if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                            if (p.Character.HumanoidRootPart.Position - myPos).Magnitude <= 18 then enemyNear = true break end
+                            if (p.Character.HumanoidRootPart.Position - myPos).Magnitude <= (settingsState.killauraRange or 15) then
+                                enemyNear = true break
+                            end
                         end
                     end
                 end
@@ -842,21 +925,21 @@ autoWeaponBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 11. Reach Multiplier & KillAura (사거리 15, 공속 0.03)
+-- 11. Reach Multiplier & KillAura (설정 UI 연동)
 -- ========================================================
 reachBtn.MouseButton1Click:Connect(function()
     featureStates.reach = not featureStates.reach
-    setBtnState(reachBtn, featureStates.reach, "Reach Multiplier (15 Studs)")
+    setBtnState(reachBtn, featureStates.reach, "Reach Multiplier")
 end)
 
 killauraBtn.MouseButton1Click:Connect(function()
     featureStates.killaura = not featureStates.killaura
-    setBtnState(killauraBtn, featureStates.killaura, "KillAura (사거리 15 / 0.03초)")
+    setBtnState(killauraBtn, featureStates.killaura, "KillAura (자동 공격)")
     if featureStates.killaura then
         task.spawn(function()
             while featureStates.killaura do
                 if isMyCharAlive() then
-                    local currentReach = 15
+                    local currentReach = settingsState.killauraRange or 15
                     local sword = getBestSword()
                     local net = ReplicatedStorage:FindFirstChild("rbxts_include")
                     if net then net = net.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("SwordHit") end
@@ -883,14 +966,14 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.03)
+                task.wait(settingsState.killauraDelay or 0.03)
             end
         end)
     end
 end)
 
 -- ========================================================
--- 12. Bow Aimbot (활 낙차 / 이동 속도 예측 [개선])
+-- 12. Bow Aimbot
 -- ========================================================
 local aimbotConn = nil
 aimbotBtn.MouseButton1Click:Connect(function()
@@ -923,9 +1006,9 @@ aimbotBtn.MouseButton1Click:Connect(function()
                     end
 
                     if closestHead then
-                        local arrowSpeed = 220 -- 화살의 속도
+                        local arrowSpeed = 220
                         local travelTime = shortestDist / arrowSpeed
-                        local dropCompensation = (shortestDist ^ 2) * 0.00018 -- 화살 낙차 보정
+                        local dropCompensation = (shortestDist ^ 2) * 0.00018
                         local predictedPosition = closestHead.Position + (targetVel * travelTime) + Vector3.new(0, dropCompensation, 0)
                         
                         Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPosition)
@@ -939,7 +1022,7 @@ aimbotBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 13. Auto Clicker [신규]
+-- 13. Auto Clicker
 -- ========================================================
 autoclickBtn.MouseButton1Click:Connect(function()
     featureStates.autoclicker = not featureStates.autoclicker
@@ -1034,7 +1117,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 15. Staff / Mod Detector [신규]
+-- 15. Staff / Mod Detector
 -- ========================================================
 staffDetBtn.MouseButton1Click:Connect(function()
     featureStates.staffdetector = not featureStates.staffdetector
@@ -1045,7 +1128,7 @@ staffDetBtn.MouseButton1Click:Connect(function()
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= LocalPlayer then
                         pcall(function()
-                            local rank = p:GetRankInGroup(5774217) -- BedWars 디폴트 그룹 ID
+                            local rank = p:GetRankInGroup(5774217)
                             if rank >= 100 then
                                 title.Text = "🚨 경고: 관리자 " .. p.Name .. " 접속 감지!"
                                 title.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -1060,7 +1143,7 @@ staffDetBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 16. Auto Toxic [신규]
+-- 16. Auto Toxic
 -- ========================================================
 autoToxicBtn.MouseButton1Click:Connect(function()
     featureStates.autotoxic = not featureStates.autotoxic
@@ -1071,7 +1154,7 @@ autoToxicBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 17. 최적화 & 설정 저장 / 불러오기 [신규]
+-- 17. 최적화 & 설정 저장 / 불러오기 (수치 설정 포함)
 -- ========================================================
 fpsBoostBtn.MouseButton1Click:Connect(function()
     featureStates.fpsboost = not featureStates.fpsboost
@@ -1092,7 +1175,11 @@ end)
 saveConfigBtn.MouseButton1Click:Connect(function()
     pcall(function()
         if writefile then
-            local json = HttpService:JSONEncode(featureStates)
+            local saveData = {
+                features = featureStates,
+                settings = settingsState
+            }
+            local json = HttpService:JSONEncode(saveData)
             writefile("RAGON_01_Config.json", json)
             saveConfigBtn.Text = "✅ 저장 완료!"
             task.wait(1.5)
@@ -1106,15 +1193,29 @@ loadConfigBtn.MouseButton1Click:Connect(function()
     pcall(function()
         if readfile and isfile and isfile("RAGON_01_Config.json") then
             local data = HttpService:JSONDecode(readfile("RAGON_01_Config.json"))
-            for key, val in pairs(data) do
-                if featureStates[key] ~= nil and featureStates[key] ~= val then
-                    local btnName = key .. "Btn"
-                    local btnObj = screenGui:FindFirstChild(btnName, true)
-                    if btnObj and btnObj:IsA("TextButton") then
-                        btnObj:MouseButton1Click()
+            
+            -- 세부 수치 설정 불러오기
+            if data.settings then
+                for k, v in pairs(data.settings) do
+                    if updateSettingUI[k] then
+                        updateSettingUI[k](v)
                     end
                 end
             end
+
+            -- 토글 상태 불러오기
+            if data.features then
+                for key, val in pairs(data.features) do
+                    if featureStates[key] ~= nil and featureStates[key] ~= val then
+                        local btnName = key .. "Btn"
+                        local btnObj = screenGui:FindFirstChild(btnName, true)
+                        if btnObj and btnObj:IsA("TextButton") then
+                            btnObj:MouseButton1Click()
+                        end
+                    end
+                end
+            end
+
             loadConfigBtn.Text = "✅ 불러오기 완료!"
             task.wait(1.5)
             loadConfigBtn.Text = "📂 설정 불러오기 (Load Config)"
@@ -1122,4 +1223,4 @@ loadConfigBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
-print("[RAGON_01_V2] 요청하신 7가지 신규 기능 탑재 패치 완료!")
+print("[RAGON_01_V2.1] 침대파괴기 수정 및 ⚙️ 세부 설정 UI 탑재 패치 완료!")
