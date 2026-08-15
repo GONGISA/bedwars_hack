@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -28,12 +29,12 @@ screenGui.Name = "RAGON_01_UI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentContainer
 
--- 메인 프레임 (버튼 추가로 높이 확장 370 -> 415)
+-- 메인 프레임 (버튼 증가로 높이 조정 510px)
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 415)
-frame.Position = UDim2.new(0.05, 0, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+frame.Size = UDim2.new(0, 230, 0, 510)
+frame.Position = UDim2.new(0.04, 0, 0.15, 0)
+frame.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -47,17 +48,17 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundTransparency = 1
-title.Text = "RAGON_01"
+title.Text = "RAGON_01 [BEDWARS]"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 18
+title.TextSize = 16
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
 -- 버튼 생성 함수
 local function createButton(name, posY)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.85, 0, 0, 36)
-    btn.Position = UDim2.new(0.075, 0, 0, posY)
+    btn.Size = UDim2.new(0.88, 0, 0, 32)
+    btn.Position = UDim2.new(0.06, 0, 0, posY)
     btn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
     btn.Text = name .. " [OFF]"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -72,14 +73,18 @@ local function createButton(name, posY)
     return btn
 end
 
-local espBtn = createButton("ESP", 40)
-local healthBtn = createButton("Health ESP", 85)
-local itemEspBtn = createButton("Item & Armor ESP", 130)
-local hitboxBtn = createButton("Hitbox ESP", 175)
-local sprintBtn = createButton("Auto Sprint", 220)
-local spiderBtn = createButton("Spider", 265)
-local killauraBtn = createButton("KillAura", 310)
-local aimbotBtn = createButton("Aimbot", 355)
+local espBtn        = createButton("ESP", 40)
+local healthBtn     = createButton("Health ESP", 77)
+local itemEspBtn    = createButton("Item & Armor ESP (Big)", 114)
+local hitboxBtn     = createButton("Hitbox ESP", 151)
+local bedGenBtn     = createButton("Bed & Gen ESP", 188)
+local antiKbBtn     = createButton("Anti Knockback", 225)
+local noFallBtn     = createButton("No Fall Damage", 262)
+local sprintBtn     = createButton("Auto Sprint", 299)
+local spiderBtn     = createButton("Spider", 336)
+local killauraBtn   = createButton("KillAura", 373)
+local aimbotBtn     = createButton("Aimbot", 410)
+local fpsBoostBtn   = createButton("FPS Boost (렉제거)", 447)
 
 -- 내 캐릭터 생존 확인 함수
 local function isMyCharAlive()
@@ -148,7 +153,7 @@ espBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 2. 동적 체력바 ESP (거리 & 히트박스 크기 반응)
+-- 2. 동적 체력바 ESP
 -- ========================================================
 local healthActive = false
 
@@ -199,20 +204,18 @@ local function updateHealthBars()
                     fill.Parent = bg
                 end
 
-                -- 거리 및 히트박스 크기에 맞춰 크기 가변 계산
                 local distScale = 1
                 if myHrp then
                     local dist = (myHrp.Position - hrp.Position).Magnitude
                     distScale = math.clamp(85 / math.max(dist, 10), 0.4, 2.5)
                 end
                 
-                -- 히트박스 Y 크기 비율 반영
                 local hitboxYRatio = hrp.Size.Y / 2
-                local barWidth = math.max(3, math.floor(5 * distScale))
+                local barWidth = math.max(4, math.floor(5 * distScale))
                 local barHeight = math.floor(38 * distScale * hitboxYRatio)
                 
                 gui.Size = UDim2.new(0, barWidth, 0, barHeight)
-                gui.ExtentsOffset = Vector3.new(-1.8 * (distScale * math.max(1, hrp.Size.X / 3)), 0, 0)
+                gui.ExtentsOffset = Vector3.new(-2.0 * (distScale * math.max(1, hrp.Size.X / 3)), 0, 0)
 
                 local fill = gui.BG:FindFirstChild("Fill")
                 if fill then
@@ -256,7 +259,7 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Item & Armor ESP
+-- 3. Item & Armor ESP (크기 및 폰트 대폭 확대)
 -- ========================================================
 local itemEspActive = false
 
@@ -363,8 +366,8 @@ local function updateItemESP()
                     gui = Instance.new("BillboardGui")
                     gui.Name = "ItemESP_Gui"
                     gui.Adornee = head
-                    gui.Size = UDim2.new(0, 200, 0, 40)
-                    gui.ExtentsOffset = Vector3.new(0, 2.8, 0)
+                    gui.Size = UDim2.new(0, 280, 0, 60) -- 기존보다 크게 확대
+                    gui.ExtentsOffset = Vector3.new(0, 3.2, 0)
                     gui.AlwaysOnTop = true
                     gui.Parent = head
 
@@ -373,9 +376,9 @@ local function updateItemESP()
                     txt.Size = UDim2.new(1, 0, 1, 0)
                     txt.BackgroundTransparency = 1
                     txt.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    txt.TextSize = 12
+                    txt.TextSize = 16 -- 글씨 크기 12 -> 16 확대
                     txt.Font = Enum.Font.SourceSansBold
-                    txt.TextStrokeTransparency = 0.2
+                    txt.TextStrokeTransparency = 0
                     txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                     txt.Parent = gui
                 end
@@ -386,7 +389,7 @@ local function updateItemESP()
                     local armor = getEquippedArmor(p)
                     local iron, dia, eme = getResources(p)
                     
-                    label.Text = string.format("[%s | %s]\n⚪ %d | 🔷 %d | 🟩 %d", weapon, armor, iron, dia, eme)
+                    label.Text = string.format("⚔️ [%s | %s]\n⚪ %d  |  🔷 %d  |  🟩 %d", weapon, armor, iron, dia, eme)
                 end
             else
                 if head and head:FindFirstChild("ItemESP_Gui") then
@@ -405,7 +408,7 @@ itemEspBtn.MouseButton1Click:Connect(function()
         task.spawn(function()
             while itemEspActive do
                 updateItemESP()
-                task.wait(0.25)
+                task.wait(0.2)
             end
         end)
     else
@@ -416,7 +419,7 @@ itemEspBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 4. Hitbox ESP (히트박스 표시 & 확장)
+-- 4. Hitbox ESP
 -- ========================================================
 local hitboxActive = false
 local HITBOX_SIZE = Vector3.new(6, 6, 6)
@@ -491,7 +494,145 @@ hitboxBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Auto Sprint
+-- 5. 침대 및 제너레이터 ESP
+-- ========================================================
+local bedGenActive = false
+
+local function removeBedGenESP()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:FindFirstChild("BedGen_ESP") then
+            obj.BedGen_ESP:Destroy()
+        end
+    end
+end
+
+local function updateBedGenESP()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local name = string.lower(obj.Name)
+            local espText, espColor = nil, nil
+
+            if string.find(name, "bed") and not string.find(name, "bedroom") then
+                espText = "🛏️ [BED]"
+                espColor = Color3.fromRGB(255, 80, 80)
+            elseif string.find(name, "diamond") and (string.find(name, "generator") or string.find(name, "gen")) then
+                espText = "🔷 [DIAMOND GEN]"
+                espColor = Color3.fromRGB(0, 200, 255)
+            elseif string.find(name, "emerald") and (string.find(name, "generator") or string.find(name, "gen")) then
+                espText = "🟩 [EMERALD GEN]"
+                espColor = Color3.fromRGB(50, 255, 100)
+            end
+
+            if espText then
+                local targetPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+                if targetPart and not targetPart:FindFirstChild("BedGen_ESP") then
+                    local bg = Instance.new("BillboardGui")
+                    bg.Name = "BedGen_ESP"
+                    bg.Adornee = targetPart
+                    bg.Size = UDim2.new(0, 160, 0, 30)
+                    bg.AlwaysOnTop = true
+                    bg.Parent = targetPart
+
+                    local txt = Instance.new("TextLabel")
+                    txt.Size = UDim2.new(1, 0, 1, 0)
+                    txt.BackgroundTransparency = 1
+                    txt.Text = espText
+                    txt.TextColor3 = espColor
+                    txt.TextSize = 14
+                    txt.Font = Enum.Font.SourceSansBold
+                    txt.TextStrokeTransparency = 0
+                    txt.Parent = bg
+                end
+            end
+        end
+    end
+end
+
+bedGenBtn.MouseButton1Click:Connect(function()
+    bedGenActive = not bedGenActive
+    if bedGenActive then
+        bedGenBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        bedGenBtn.Text = "Bed & Gen ESP [ON]"
+        task.spawn(function()
+            while bedGenActive do
+                updateBedGenESP()
+                task.wait(2.0)
+            end
+        end)
+    else
+        bedGenBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        bedGenBtn.Text = "Bed & Gen ESP [OFF]"
+        removeBedGenESP()
+    end
+end)
+
+-- ========================================================
+-- 6. Anti Knockback (넉백 감소)
+-- ========================================================
+local antiKbActive = false
+local antiKbConn = nil
+
+antiKbBtn.MouseButton1Click:Connect(function()
+    antiKbActive = not antiKbActive
+    if antiKbActive then
+        antiKbBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        antiKbBtn.Text = "Anti KB [ON]"
+        
+        antiKbConn = RunService.Heartbeat:Connect(function()
+            if isMyCharAlive() then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local vel = hrp.AssemblyLinearVelocity
+                -- 피격 시 수평 방향 넉백 속도 제한/제거
+                if math.abs(vel.X) > 25 or math.abs(vel.Z) > 25 then
+                    hrp.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
+                end
+            end
+        end)
+    else
+        antiKbBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        antiKbBtn.Text = "Anti KB [OFF]"
+        if antiKbConn then
+            antiKbConn:Disconnect()
+            antiKbConn = nil
+        end
+    end
+end)
+
+-- ========================================================
+-- 7. No Fall Damage (낙사 방지)
+-- ========================================================
+local noFallActive = false
+local noFallConn = nil
+
+noFallBtn.MouseButton1Click:Connect(function()
+    noFallActive = not noFallActive
+    if noFallActive then
+        noFallBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        noFallBtn.Text = "No Fall [ON]"
+
+        noFallConn = RunService.RenderStepped:Connect(function()
+            if isMyCharAlive() then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                if hrp.AssemblyLinearVelocity.Y < -35 then
+                    local ray = workspace:Raycast(hrp.Position, Vector3.new(0, -12, 0))
+                    if ray then
+                        hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, -5, hrp.AssemblyLinearVelocity.Z)
+                    end
+                end
+            end
+        end)
+    else
+        noFallBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        noFallBtn.Text = "No Fall [OFF]"
+        if noFallConn then
+            noFallConn:Disconnect()
+            noFallConn = nil
+        end
+    end
+end)
+
+-- ========================================================
+-- 8. Auto Sprint
 -- ========================================================
 local sprintActive = false
 local sprintConnection = nil
@@ -526,7 +667,7 @@ sprintBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. Spider
+-- 9. Spider
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -571,7 +712,7 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 7. Bedwars KillAura
+-- 10. Bedwars KillAura
 -- ========================================================
 local killauraActive = false
 local range = 14
@@ -642,7 +783,7 @@ killauraBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 8. Aimbot
+-- 11. Aimbot
 -- ========================================================
 local aimbotActive = false
 local aimbotConnection = nil
@@ -739,4 +880,66 @@ aimbotBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] Hitbox ESP 및 거리/크기 가변 Health ESP 적용 완료.")
+-- ========================================================
+-- 12. FPS Boost (렉제거 & 최적화)
+-- ========================================================
+local fpsBoostActive = false
+
+fpsBoostBtn.MouseButton1Click:Connect(function()
+    fpsBoostActive = not fpsBoostActive
+    if fpsBoostActive then
+        fpsBoostBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        fpsBoostBtn.Text = "FPS Boost [ON]"
+
+        pcall(function()
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") then
+                    v.Enabled = false
+                end
+            end
+        end)
+    else
+        fpsBoostBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        fpsBoostBtn.Text = "FPS Boost [OFF]"
+    end
+end)
+
+-- ========================================================
+-- 📢 적팀 침대 파괴 감지 및 실시간 화면 알림
+-- ========================================================
+local alertGui = Instance.new("BillboardGui")
+alertGui.Name = "BedAlertBanner"
+
+local function showBedBreakAlert(msg)
+    local alertLabel = Instance.new("TextLabel")
+    alertLabel.Size = UDim2.new(0, 360, 0, 45)
+    alertLabel.Position = UDim2.new(0.5, -180, 0.1, 0)
+    alertLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    alertLabel.BackgroundTransparency = 0.2
+    alertLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
+    alertLabel.TextSize = 16
+    alertLabel.Font = Enum.Font.SourceSansBold
+    alertLabel.Text = "⚠️ " .. msg
+    alertLabel.Parent = screenGui
+
+    local alertCorner = Instance.new("UICorner")
+    alertCorner.CornerRadius = UDim.new(0, 8)
+    alertCorner.Parent = alertLabel
+
+    task.delay(4, function()
+        if alertLabel then alertLabel:Destroy() end
+    end)
+end
+
+workspace.DescendantRemoving:Connect(function(descendant)
+    if string.find(string.lower(descendant.Name), "bed") and not string.find(string.lower(descendant.Name), "bedroom") then
+        showBedBreakAlert("팀 침대 파괴 감지! [침대 제거됨]")
+    end
+end)
+
+print("[RAGON_01] 넉백제어, 낙사방지, Bed/Gen ESP, FPS 보스트 및 확대된 Item ESP 연동 완료!")
