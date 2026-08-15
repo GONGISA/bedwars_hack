@@ -3,6 +3,8 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local TextChatService = game:GetService("TextChatService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -13,7 +15,7 @@ pcall(function()
     end
 end)
 
--- UI 컨테이너
+-- UI 컨테이너 설정
 local parentContainer = game:GetService("CoreGui")
 if not pcall(function() local _ = parentContainer.Name end) then
     parentContainer = LocalPlayer:WaitForChild("PlayerGui")
@@ -31,7 +33,7 @@ screenGui.Parent = parentContainer
 -- 메인 프레임
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 320, 0, 380)
+frame.Size = UDim2.new(0, 340, 0, 420)
 frame.Position = UDim2.new(0.03, 0, 0.15, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
 frame.BorderSizePixel = 0
@@ -149,7 +151,7 @@ end
 local combatScroll = createTab("Combat", "⚔️ 전투")
 local espScroll    = createTab("ESP", "👁️ ESP")
 local utilScroll   = createTab("Utility", "🛠️ 유틸")
-local optScroll    = createTab("Opt", "🚀 최적화")
+local optScroll    = createTab("Opt", "⚙️ 시스템")
 
 for name, btn in pairs(tabs) do
     btn.MouseButton1Click:Connect(function() switchTab(name) end)
@@ -157,11 +159,16 @@ end
 
 switchTab("Combat")
 
-local function createButton(parentScroll, name)
+local featureStates = {}
+
+local function createButton(parentScroll, keyName, displayName)
+    featureStates[keyName] = false
+
     local btn = Instance.new("TextButton")
+    btn.Name = keyName .. "Btn"
     btn.Size = UDim2.new(1, -6, 0, 34)
     btn.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
-    btn.Text = name .. " [OFF]"
+    btn.Text = displayName .. " [OFF]"
     btn.TextColor3 = Color3.fromRGB(220, 220, 220)
     btn.TextSize = 13
     btn.Font = Enum.Font.SourceSansSemibold
@@ -179,32 +186,61 @@ local function createButton(parentScroll, name)
     return btn
 end
 
-local function setBtnState(btn, active, name)
+local function setBtnState(btn, active, displayName)
     btn.BackgroundColor3 = active and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(32, 32, 38)
     btn.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
-    btn.Text = name .. " [" .. (active and "ON" or "OFF") .. "]"
+    btn.Text = displayName .. " [" .. (active and "ON" or "OFF") .. "]"
 end
 
--- 버튼 생성
-local killauraBtn   = createButton(combatScroll, "KillAura (자동 공격)")
-local aimbotBtn     = createButton(combatScroll, "Aimbot (RMB Hold)")
-local autoWeaponBtn = createButton(combatScroll, "Auto Weapon Switch")
-local reachBtn      = createButton(combatScroll, "Reach Multiplier (15 Studs)")
+-- 전투 버튼
+local killauraBtn   = createButton(combatScroll, "killaura", "KillAura (사거리 15 / 0.03초)")
+local aimbotBtn     = createButton(combatScroll, "aimbot", "Bow Aimbot (낙사/이동예측)")
+local autoclickBtn  = createButton(combatScroll, "autoclicker", "Auto Clicker (LMB 연타)")
+local autoWeaponBtn = createButton(combatScroll, "autoweapon", "Auto Weapon Switch")
+local reachBtn      = createButton(combatScroll, "reach", "Reach Multiplier (15 Studs)")
 
-local espBtn        = createButton(espScroll, "Player ESP (하이라이트)")
-local healthBtn     = createButton(espScroll, "Health ESP (체력 바)")
-local itemEspBtn    = createButton(espScroll, "Item & Armor ESP (아이템/갑옷)")
-local hitboxBtn     = createButton(espScroll, "Hitbox ESP (히트박스 확장)")
-local bedGenBtn     = createButton(espScroll, "Bed & Gen ESP (침대/생성기)")
+-- ESP 버튼
+local espBtn        = createButton(espScroll, "playeresp", "Player ESP (하이라이트)")
+local healthBtn     = createButton(espScroll, "healthesp", "Health ESP (체력 바)")
+local itemEspBtn    = createButton(espScroll, "itemesp", "Item & Armor ESP (아이템/갑옷)")
+local hitboxBtn     = createButton(espScroll, "hitbox", "Hitbox ESP (히트박스 확장)")
+local bedGenBtn     = createButton(espScroll, "bedgenesp", "Bed & Gen ESP (침대/생성기)")
 
-local scaffoldBtn   = createButton(utilScroll, "Scaffold (Auto Bridge)")
-local bedNukerBtn   = createButton(utilScroll, "Bed Nuker (자동 침대 파괴)")
-local antiKbBtn     = createButton(utilScroll, "Anti Knockback (넉백 무시)")
-local noFallBtn     = createButton(utilScroll, "No Fall Damage (낙사 방지)")
-local sprintBtn     = createButton(utilScroll, "Auto Sprint (자동 달리기)")
-local spiderBtn     = createButton(utilScroll, "Spider (벽 타기)")
+-- 유틸리티 버튼
+local scaffoldBtn   = createButton(utilScroll, "scaffold", "Scaffold (Auto Bridge)")
+local bedNukerBtn   = createButton(utilScroll, "bednuker", "Bed Nuker (자동 침대 파괴)")
+local chestStealBtn = createButton(utilScroll, "cheststealer", "Chest Stealer (상자 자동 수거)")
+local blinkBtn      = createButton(utilScroll, "blink", "Blink / Lag Switch (순간이동)")
+local antiKbBtn     = createButton(utilScroll, "antikb", "Anti Knockback (넉백 무시)")
+local noFallBtn     = createButton(utilScroll, "nofall", "No Fall Damage (낙사 방지)")
+local sprintBtn     = createButton(utilScroll, "sprint", "Auto Sprint (자동 달리기)")
+local spiderBtn     = createButton(utilScroll, "spider", "Spider (벽 타기)")
 
-local fpsBoostBtn   = createButton(optScroll, "FPS Boost (렉제거 & 최적화)")
+-- 시스템 & 최적화 버튼
+local fpsBoostBtn   = createButton(optScroll, "fpsboost", "FPS Boost (렉제거 & 최적화)")
+local staffDetBtn   = createButton(optScroll, "staffdetector", "Staff / Mod Detector (관리자 감지)")
+local autoToxicBtn  = createButton(optScroll, "autotoxic", "Auto Toxic (자동 채팅 도발)")
+
+-- 설정 저장 / 불러오기 전용 버튼 (Toggle 형태가 아닌 Action 버튼)
+local saveConfigBtn = Instance.new("TextButton")
+saveConfigBtn.Size = UDim2.new(1, -6, 0, 34)
+saveConfigBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+saveConfigBtn.Text = "💾 설정 저장하기 (Save Config)"
+saveConfigBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveConfigBtn.TextSize = 13
+saveConfigBtn.Font = Enum.Font.SourceSansBold
+saveConfigBtn.Parent = optScroll
+local scCorner = Instance.new("UICorner") scCorner.CornerRadius = UDim.new(0, 6) scCorner.Parent = saveConfigBtn
+
+local loadConfigBtn = Instance.new("TextButton")
+loadConfigBtn.Size = UDim2.new(1, -6, 0, 34)
+loadConfigBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+loadConfigBtn.Text = "📂 설정 불러오기 (Load Config)"
+loadConfigBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadConfigBtn.TextSize = 13
+loadConfigBtn.Font = Enum.Font.SourceSansBold
+loadConfigBtn.Parent = optScroll
+local lcCorner = Instance.new("UICorner") lcCorner.CornerRadius = UDim.new(0, 6) lcCorner.Parent = loadConfigBtn
 
 ---------------------------------------------------------
 -- 백엔드 헬퍼 로직
@@ -217,22 +253,25 @@ local function isMyCharAlive()
     return hum and hum.Health > 0 and hrp ~= nil
 end
 
+local function sendChatMessage(msg)
+    pcall(function()
+        if TextChatService and TextChatService.ChatInputBarConfiguration then
+            local channel = TextChatService.TextChannels.RBXGeneral
+            if channel then channel:SendAsync(msg) end
+        else
+            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+        end
+    end)
+end
+
 local function getBestSword()
     local char = LocalPlayer.Character
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     local bestSword = nil
     local bestPriority = 0
+    local swordPriority = { ["emerald_sword"] = 5, ["diamond_sword"] = 4, ["iron_sword"] = 3, ["stone_sword"] = 2, ["wood_sword"] = 1 }
 
-    local swordPriority = {
-        ["emerald_sword"] = 5,
-        ["diamond_sword"] = 4,
-        ["iron_sword"]    = 3,
-        ["stone_sword"]   = 2,
-        ["wood_sword"]    = 1
-    }
-
-    local containers = {char, backpack}
-    for _, container in ipairs(containers) do
+    for _, container in ipairs({char, backpack}) do
         if container then
             for _, item in ipairs(container:GetChildren()) do
                 if item:IsA("Tool") then
@@ -251,18 +290,11 @@ local function getBestSword()
 end
 
 local function getBlockItem()
-    local char = LocalPlayer.Character
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    local containers = {char, backpack}
-
-    for _, container in ipairs(containers) do
+    for _, container in ipairs({LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")}) do
         if container then
             for _, item in ipairs(container:GetChildren()) do
-                if item:IsA("Tool") then
-                    local name = string.lower(item.Name)
-                    if string.find(name, "wool") or string.find(name, "block") or string.find(name, "wood") or string.find(name, "stone") then
-                        return item
-                    end
+                if item:IsA("Tool") and (string.find(string.lower(item.Name), "wool") or string.find(string.lower(item.Name), "block")) then
+                    return item
                 end
             end
         end
@@ -329,7 +361,6 @@ end
 -- ========================================================
 -- 1. Player ESP
 -- ========================================================
-local espActive = false
 local function updateESP()
     for _, p in ipairs(Players:GetPlayers()) do
         local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
@@ -354,11 +385,11 @@ local function updateESP()
 end
 
 espBtn.MouseButton1Click:Connect(function()
-    espActive = not espActive
-    setBtnState(espBtn, espActive, "Player ESP (하이라이트)")
-    if espActive then
+    featureStates.playeresp = not featureStates.playeresp
+    setBtnState(espBtn, featureStates.playeresp, "Player ESP (하이라이트)")
+    if featureStates.playeresp then
         task.spawn(function()
-            while espActive do updateESP() task.wait(0.3) end
+            while featureStates.playeresp do updateESP() task.wait(0.3) end
         end)
     else
         for _, p in ipairs(Players:GetPlayers()) do
@@ -368,14 +399,12 @@ espBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 2. Health ESP (슬림형 사이즈 축소)
+-- 2. Health ESP
 -- ========================================================
-local healthActive = false
 local function removeHealthESP()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and hrp:FindFirstChild("HealthESP_Gui") then hrp.HealthESP_Gui:Destroy() end
+        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.HumanoidRootPart:FindFirstChild("HealthESP_Gui") then
+            p.Character.HumanoidRootPart.HealthESP_Gui:Destroy()
         end
     end
 end
@@ -392,7 +421,7 @@ local function updateHealthESP()
                     gui = Instance.new("BillboardGui")
                     gui.Name = "HealthESP_Gui"
                     gui.Adornee = hrp
-                    gui.Size = UDim2.new(0, 50, 0, 10) -- 컴팩트 사이즈
+                    gui.Size = UDim2.new(0, 50, 0, 10)
                     gui.ExtentsOffset = Vector3.new(0, 2.5, 0)
                     gui.AlwaysOnTop = true
                     gui.Parent = hrp
@@ -439,11 +468,11 @@ local function updateHealthESP()
 end
 
 healthBtn.MouseButton1Click:Connect(function()
-    healthActive = not healthActive
-    setBtnState(healthBtn, healthActive, "Health ESP (체력 바)")
-    if healthActive then
+    featureStates.healthesp = not featureStates.healthesp
+    setBtnState(healthBtn, featureStates.healthesp, "Health ESP (체력 바)")
+    if featureStates.healthesp then
         task.spawn(function()
-            while healthActive do updateHealthESP() task.wait(0.2) end
+            while featureStates.healthesp do updateHealthESP() task.wait(0.2) end
         end)
     else
         removeHealthESP()
@@ -451,14 +480,12 @@ healthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Item & Armor ESP (사이즈 축소 및 깔끔한 배치)
+-- 3. Item & Armor ESP
 -- ========================================================
-local itemEspActive = false
 local function removeItemESP()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character then
-            local head = p.Character:FindFirstChild("Head")
-            if head and head:FindFirstChild("ItemESP_Gui") then head.ItemESP_Gui:Destroy() end
+        if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("ItemESP_Gui") then
+            p.Character.Head.ItemESP_Gui:Destroy()
         end
     end
 end
@@ -467,17 +494,15 @@ local function updateItemESP()
     for _, p in ipairs(Players:GetPlayers()) do
         local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
         if isEnemy and p.Character then
-            local char = p.Character
-            local head = char:FindFirstChild("Head")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-
+            local head = p.Character:FindFirstChild("Head")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
             if head and hum and hum.Health > 0 then
                 local gui = head:FindFirstChild("ItemESP_Gui")
                 if not gui then
                     gui = Instance.new("BillboardGui")
                     gui.Name = "ItemESP_Gui"
                     gui.Adornee = head
-                    gui.Size = UDim2.new(0, 110, 0, 24) -- 대폭 축소된 크기
+                    gui.Size = UDim2.new(0, 110, 0, 24)
                     gui.ExtentsOffset = Vector3.new(0, 2.8, 0)
                     gui.AlwaysOnTop = true
                     gui.Parent = head
@@ -509,11 +534,11 @@ local function updateItemESP()
 end
 
 itemEspBtn.MouseButton1Click:Connect(function()
-    itemEspActive = not itemEspActive
-    setBtnState(itemEspBtn, itemEspActive, "Item & Armor ESP (아이템/갑옷)")
-    if itemEspActive then
+    featureStates.itemesp = not featureStates.itemesp
+    setBtnState(itemEspBtn, featureStates.itemesp, "Item & Armor ESP (아이템/갑옷)")
+    if featureStates.itemesp then
         task.spawn(function()
-            while itemEspActive do updateItemESP() task.wait(0.3) end
+            while featureStates.itemesp do updateItemESP() task.wait(0.3) end
         end)
     else
         removeItemESP()
@@ -523,9 +548,6 @@ end)
 -- ========================================================
 -- 4. Hitbox ESP
 -- ========================================================
-local hitboxActive = false
-local HITBOX_SIZE = Vector3.new(6, 6, 6)
-
 local function removeHitbox()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -547,7 +569,7 @@ local function updateHitbox()
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
             if hrp and hum and hum.Health > 0 then
-                hrp.Size = HITBOX_SIZE
+                hrp.Size = Vector3.new(6, 6, 6)
                 hrp.Transparency = 0.8
                 hrp.BrickColor = BrickColor.new("Really red")
                 hrp.Material = Enum.Material.Neon
@@ -573,11 +595,11 @@ local function updateHitbox()
 end
 
 hitboxBtn.MouseButton1Click:Connect(function()
-    hitboxActive = not hitboxActive
-    setBtnState(hitboxBtn, hitboxActive, "Hitbox ESP (히트박스 확장)")
-    if hitboxActive then
+    featureStates.hitbox = not featureStates.hitbox
+    setBtnState(hitboxBtn, featureStates.hitbox, "Hitbox ESP (히트박스 확장)")
+    if featureStates.hitbox then
         task.spawn(function()
-            while hitboxActive do updateHitbox() task.wait(0.3) end
+            while featureStates.hitbox do updateHitbox() task.wait(0.3) end
         end)
     else
         removeHitbox()
@@ -585,9 +607,8 @@ hitboxBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bed & Gen ESP (크기 축소)
+-- 5. Bed & Gen ESP
 -- ========================================================
-local bedGenActive = false
 local function removeBedGenESP()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:FindFirstChild("BedGen_ESP") then obj.BedGen_ESP:Destroy() end
@@ -617,7 +638,7 @@ local function updateBedGenESP()
                     local bg = Instance.new("BillboardGui")
                     bg.Name = "BedGen_ESP"
                     bg.Adornee = targetPart
-                    bg.Size = UDim2.new(0, 80, 0, 16) -- 컴팩트 사이즈
+                    bg.Size = UDim2.new(0, 80, 0, 16)
                     bg.AlwaysOnTop = true
                     bg.Parent = targetPart
 
@@ -637,11 +658,11 @@ local function updateBedGenESP()
 end
 
 bedGenBtn.MouseButton1Click:Connect(function()
-    bedGenActive = not bedGenActive
-    setBtnState(bedGenBtn, bedGenActive, "Bed & Gen ESP (침대/생성기)")
-    if bedGenActive then
+    featureStates.bedgenesp = not featureStates.bedgenesp
+    setBtnState(bedGenBtn, featureStates.bedgenesp, "Bed & Gen ESP (침대/생성기)")
+    if featureStates.bedgenesp then
         task.spawn(function()
-            while bedGenActive do updateBedGenESP() task.wait(2.0) end
+            while featureStates.bedgenesp do updateBedGenESP() task.wait(2.0) end
         end)
     else
         removeBedGenESP()
@@ -649,19 +670,17 @@ bedGenBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. Scaffold (Auto Bridge - 버그 수정완료)
+-- 6. Scaffold
 -- ========================================================
-local scaffoldActive, scaffoldConn = false, nil
+local scaffoldConn = nil
 scaffoldBtn.MouseButton1Click:Connect(function()
-    scaffoldActive = not scaffoldActive
-    setBtnState(scaffoldBtn, scaffoldActive, "Scaffold (Auto Bridge)")
-    if scaffoldActive then
+    featureStates.scaffold = not featureStates.scaffold
+    setBtnState(scaffoldBtn, featureStates.scaffold, "Scaffold (Auto Bridge)")
+    if featureStates.scaffold then
         scaffoldConn = RunService.Heartbeat:Connect(function()
             if isMyCharAlive() then
                 local hrp = LocalPlayer.Character.HumanoidRootPart
                 local underPos = hrp.Position - Vector3.new(0, 3.5, 0)
-                
-                -- 발 아래 레이캐스트 체크
                 local ray = workspace:Raycast(hrp.Position, Vector3.new(0, -4, 0))
                 if not ray then
                     local blockItem = getBlockItem()
@@ -689,15 +708,14 @@ scaffoldBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 7. Bed Nuker (자동 침대 파괴 - 로직 교체 및 작동 수정)
+-- 7. Bed Nuker
 -- ========================================================
-local bedNukerActive = false
 bedNukerBtn.MouseButton1Click:Connect(function()
-    bedNukerActive = not bedNukerActive
-    setBtnState(bedNukerBtn, bedNukerActive, "Bed Nuker (자동 침대 파괴)")
-    if bedNukerActive then
+    featureStates.bednuker = not featureStates.bednuker
+    setBtnState(bedNukerBtn, featureStates.bednuker, "Bed Nuker (자동 침대 파괴)")
+    if featureStates.bednuker then
         task.spawn(function()
-            while bedNukerActive do
+            while featureStates.bednuker do
                 if isMyCharAlive() then
                     pcall(function()
                         local myPos = LocalPlayer.Character.HumanoidRootPart.Position
@@ -728,13 +746,76 @@ bedNukerBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 8. Auto Weapon Switch
+-- 8. Chest Stealer [신규]
 -- ========================================================
-local autoWeaponActive, autoWeaponConn = false, nil
+chestStealBtn.MouseButton1Click:Connect(function()
+    featureStates.cheststealer = not featureStates.cheststealer
+    setBtnState(chestStealBtn, featureStates.cheststealer, "Chest Stealer (상자 자동 수거)")
+    if featureStates.cheststealer then
+        task.spawn(function()
+            while featureStates.cheststealer do
+                if isMyCharAlive() then
+                    pcall(function()
+                        local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+                        for _, chest in ipairs(workspace:GetDescendants()) do
+                            if chest:IsA("Model") and string.find(string.lower(chest.Name), "chest") then
+                                local primary = chest.PrimaryPart or chest:FindFirstChildWhichIsA("BasePart")
+                                if primary and (primary.Position - myPos).Magnitude <= 15 then
+                                    local netManaged = ReplicatedStorage:FindFirstChild("rbxts_include")
+                                    if netManaged then
+                                        local chestGetNet = netManaged.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("ChestGetItem")
+                                        if chestGetNet then
+                                            chestGetNet:InvokeServer(chest)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.15)
+            end
+        end)
+    end
+end)
+
+-- ========================================================
+-- 9. Blink / Lag Switch [신규]
+-- ========================================================
+local blinkClone = nil
+blinkBtn.MouseButton1Click:Connect(function()
+    featureStates.blink = not featureStates.blink
+    setBtnState(blinkBtn, featureStates.blink, "Blink / Lag Switch (순간이동)")
+    if featureStates.blink then
+        if isMyCharAlive() then
+            local char = LocalPlayer.Character
+            char.Archivable = true
+            blinkClone = char:Clone()
+            blinkClone.Parent = workspace
+            for _, v in ipairs(blinkClone:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Transparency = 0.5
+                    v.CanCollide = false
+                end
+            end
+            char.HumanoidRootPart.Anchored = true
+        end
+    else
+        if isMyCharAlive() then
+            LocalPlayer.Character.HumanoidRootPart.Anchored = false
+            if blinkClone then blinkClone:Destroy() blinkClone = nil end
+        end
+    end
+end)
+
+-- ========================================================
+-- 10. Auto Weapon Switch
+-- ========================================================
+local autoWeaponConn = nil
 autoWeaponBtn.MouseButton1Click:Connect(function()
-    autoWeaponActive = not autoWeaponActive
-    setBtnState(autoWeaponBtn, autoWeaponActive, "Auto Weapon Switch")
-    if autoWeaponActive then
+    featureStates.autoweapon = not featureStates.autoweapon
+    setBtnState(autoWeaponBtn, featureStates.autoweapon, "Auto Weapon Switch")
+    if featureStates.autoweapon then
         autoWeaponConn = RunService.RenderStepped:Connect(function()
             if isMyCharAlive() then
                 local myPos = LocalPlayer.Character.HumanoidRootPart.Position
@@ -761,23 +842,21 @@ autoWeaponBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 9. Reach Multiplier & KillAura (사거리 15, 공속 0.03초)
+-- 11. Reach Multiplier & KillAura (사거리 15, 공속 0.03)
 -- ========================================================
-local reachActive = false
 reachBtn.MouseButton1Click:Connect(function()
-    reachActive = not reachActive
-    setBtnState(reachBtn, reachActive, "Reach Multiplier (15 Studs)")
+    featureStates.reach = not featureStates.reach
+    setBtnState(reachBtn, featureStates.reach, "Reach Multiplier (15 Studs)")
 end)
 
-local killauraActive = false
 killauraBtn.MouseButton1Click:Connect(function()
-    killauraActive = not killauraActive
-    setBtnState(killauraBtn, killauraActive, "KillAura (자동 공격)")
-    if killauraActive then
+    featureStates.killaura = not featureStates.killaura
+    setBtnState(killauraBtn, featureStates.killaura, "KillAura (사거리 15 / 0.03초)")
+    if featureStates.killaura then
         task.spawn(function()
-            while killauraActive do
+            while featureStates.killaura do
                 if isMyCharAlive() then
-                    local currentReach = 15 -- 사용자 요청: 사거리 15
+                    local currentReach = 15
                     local sword = getBestSword()
                     local net = ReplicatedStorage:FindFirstChild("rbxts_include")
                     if net then net = net.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("SwordHit") end
@@ -804,20 +883,89 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.03) -- 사용자 요청: 공속 0.03초
+                task.wait(0.03)
             end
         end)
     end
 end)
 
 -- ========================================================
--- 10. 이동 / 유틸리티
+-- 12. Bow Aimbot (활 낙차 / 이동 속도 예측 [개선])
 -- ========================================================
-local antiKbActive, antiKbConn = false, nil
+local aimbotConn = nil
+aimbotBtn.MouseButton1Click:Connect(function()
+    featureStates.aimbot = not featureStates.aimbot
+    setBtnState(aimbotBtn, featureStates.aimbot, "Bow Aimbot (낙사/이동예측)")
+    if featureStates.aimbot then
+        aimbotConn = RunService.RenderStepped:Connect(function()
+            local rmbPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+            if rmbPressed and isMyCharAlive() then
+                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool and (string.find(string.lower(tool.Name), "bow") or string.find(string.lower(tool.Name), "crossbow")) then
+                    local closestHead = nil
+                    local shortestDist = math.huge
+                    local targetVel = Vector3.zero
+
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
+                            if p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.Head.Position).Magnitude
+                                    if dist < shortestDist then
+                                        shortestDist = dist
+                                        closestHead = p.Character.Head
+                                        targetVel = p.Character.HumanoidRootPart.AssemblyLinearVelocity
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if closestHead then
+                        local arrowSpeed = 220 -- 화살의 속도
+                        local travelTime = shortestDist / arrowSpeed
+                        local dropCompensation = (shortestDist ^ 2) * 0.00018 -- 화살 낙차 보정
+                        local predictedPosition = closestHead.Position + (targetVel * travelTime) + Vector3.new(0, dropCompensation, 0)
+                        
+                        Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPosition)
+                    end
+                end
+            end
+        end)
+    else
+        if aimbotConn then aimbotConn:Disconnect() aimbotConn = nil end
+    end
+end)
+
+-- ========================================================
+-- 13. Auto Clicker [신규]
+-- ========================================================
+autoclickBtn.MouseButton1Click:Connect(function()
+    featureStates.autoclicker = not featureStates.autoclicker
+    setBtnState(autoclickBtn, featureStates.autoclicker, "Auto Clicker (LMB 연타)")
+    if featureStates.autoclicker then
+        task.spawn(function()
+            while featureStates.autoclicker do
+                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    pcall(function()
+                        if mouse1click then mouse1click() end
+                    end)
+                end
+                task.wait(0.02)
+            end
+        end)
+    end
+end)
+
+-- ========================================================
+-- 14. 이동 및 보조 유틸리티
+-- ========================================================
+local antiKbConn = nil
 antiKbBtn.MouseButton1Click:Connect(function()
-    antiKbActive = not antiKbActive
-    setBtnState(antiKbBtn, antiKbActive, "Anti Knockback (넉백 무시)")
-    if antiKbActive then
+    featureStates.antikb = not featureStates.antikb
+    setBtnState(antiKbBtn, featureStates.antikb, "Anti Knockback (넉백 무시)")
+    if featureStates.antikb then
         antiKbConn = RunService.Heartbeat:Connect(function()
             if isMyCharAlive() then
                 local vel = LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity
@@ -831,11 +979,11 @@ antiKbBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local noFallActive, noFallConn = false, nil
+local noFallConn = nil
 noFallBtn.MouseButton1Click:Connect(function()
-    noFallActive = not noFallActive
-    setBtnState(noFallBtn, noFallActive, "No Fall Damage (낙사 방지)")
-    if noFallActive then
+    featureStates.nofall = not featureStates.nofall
+    setBtnState(noFallBtn, featureStates.nofall, "No Fall Damage (낙사 방지)")
+    if featureStates.nofall then
         noFallConn = RunService.RenderStepped:Connect(function()
             if isMyCharAlive() then
                 local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -849,11 +997,11 @@ noFallBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local sprintActive, sprintConn = false, nil
+local sprintConn = nil
 sprintBtn.MouseButton1Click:Connect(function()
-    sprintActive = not sprintActive
-    setBtnState(sprintBtn, sprintActive, "Auto Sprint (자동 달리기)")
-    if sprintActive then
+    featureStates.sprint = not featureStates.sprint
+    setBtnState(sprintBtn, featureStates.sprint, "Auto Sprint (자동 달리기)")
+    if featureStates.sprint then
         sprintConn = RunService.RenderStepped:Connect(function()
             if isMyCharAlive() then
                 local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -865,11 +1013,11 @@ sprintBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local spiderActive, spiderConn = false, nil
+local spiderConn = nil
 spiderBtn.MouseButton1Click:Connect(function()
-    spiderActive = not spiderActive
-    setBtnState(spiderBtn, spiderActive, "Spider (벽 타기)")
-    if spiderActive then
+    featureStates.spider = not featureStates.spider
+    setBtnState(spiderBtn, featureStates.spider, "Spider (벽 타기)")
+    if featureStates.spider then
         spiderConn = RunService.RenderStepped:Connect(function()
             if isMyCharAlive() then
                 local char = LocalPlayer.Character
@@ -885,48 +1033,50 @@ spiderBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local aimbotActive, aimbotConn = false, nil
-aimbotBtn.MouseButton1Click:Connect(function()
-    aimbotActive = not aimbotActive
-    setBtnState(aimbotBtn, aimbotActive, "Aimbot (RMB Hold)")
-    if aimbotActive then
-        aimbotConn = RunService.RenderStepped:Connect(function()
-            local rmbPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-            if rmbPressed and isMyCharAlive() then
-                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if tool and (string.find(string.lower(tool.Name), "bow") or string.find(string.lower(tool.Name), "crossbow")) then
-                    local closestHead = nil
-                    local shortestDist = math.huge
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
-                            if p.Character and p.Character:FindFirstChild("Head") then
-                                local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                                if hum and hum.Health > 0 then
-                                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.Head.Position).Magnitude
-                                    if dist < shortestDist then shortestDist = dist closestHead = p.Character.Head end
-                                end
+-- ========================================================
+-- 15. Staff / Mod Detector [신규]
+-- ========================================================
+staffDetBtn.MouseButton1Click:Connect(function()
+    featureStates.staffdetector = not featureStates.staffdetector
+    setBtnState(staffDetBtn, featureStates.staffdetector, "Staff / Mod Detector (관리자 감지)")
+    if featureStates.staffdetector then
+        task.spawn(function()
+            while featureStates.staffdetector do
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer then
+                        pcall(function()
+                            local rank = p:GetRankInGroup(5774217) -- BedWars 디폴트 그룹 ID
+                            if rank >= 100 then
+                                title.Text = "🚨 경고: 관리자 " .. p.Name .. " 접속 감지!"
+                                title.TextColor3 = Color3.fromRGB(255, 0, 0)
                             end
-                        end
-                    end
-                    if closestHead then
-                        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestHead.Position + Vector3.new(0, shortestDist*0.08, 0))
+                        end)
                     end
                 end
+                task.wait(5.0)
             end
         end)
-    else
-        if aimbotConn then aimbotConn:Disconnect() aimbotConn = nil end
     end
 end)
 
 -- ========================================================
--- 11. 최적화
+-- 16. Auto Toxic [신규]
 -- ========================================================
-local fpsBoostActive = false
+autoToxicBtn.MouseButton1Click:Connect(function()
+    featureStates.autotoxic = not featureStates.autotoxic
+    setBtnState(autoToxicBtn, featureStates.autotoxic, "Auto Toxic (자동 채팅 도발)")
+    if featureStates.autotoxic then
+        sendChatMessage("RAGON_01 SCRIPT LOADED | EZ MATCH")
+    end
+end)
+
+-- ========================================================
+-- 17. 최적화 & 설정 저장 / 불러오기 [신규]
+-- ========================================================
 fpsBoostBtn.MouseButton1Click:Connect(function()
-    fpsBoostActive = not fpsBoostActive
-    setBtnState(fpsBoostBtn, fpsBoostActive, "FPS Boost (렉제거 & 최적화)")
-    if fpsBoostActive then
+    featureStates.fpsboost = not featureStates.fpsboost
+    setBtnState(fpsBoostBtn, featureStates.fpsboost, "FPS Boost (렉제거 & 최적화)")
+    if featureStates.fpsboost then
         pcall(function()
             Lighting.GlobalShadows = false
             Lighting.FogEnd = 9e9
@@ -938,4 +1088,38 @@ fpsBoostBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] 기능 및 버그 수정 패치 적용 완료!")
+-- Config Save Logic
+saveConfigBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        if writefile then
+            local json = HttpService:JSONEncode(featureStates)
+            writefile("RAGON_01_Config.json", json)
+            saveConfigBtn.Text = "✅ 저장 완료!"
+            task.wait(1.5)
+            saveConfigBtn.Text = "💾 설정 저장하기 (Save Config)"
+        end
+    end)
+end)
+
+-- Config Load Logic
+loadConfigBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        if readfile and isfile and isfile("RAGON_01_Config.json") then
+            local data = HttpService:JSONDecode(readfile("RAGON_01_Config.json"))
+            for key, val in pairs(data) do
+                if featureStates[key] ~= nil and featureStates[key] ~= val then
+                    local btnName = key .. "Btn"
+                    local btnObj = screenGui:FindFirstChild(btnName, true)
+                    if btnObj and btnObj:IsA("TextButton") then
+                        btnObj:MouseButton1Click()
+                    end
+                end
+            end
+            loadConfigBtn.Text = "✅ 불러오기 완료!"
+            task.wait(1.5)
+            loadConfigBtn.Text = "📂 설정 불러오기 (Load Config)"
+        end
+    end)
+end)
+
+print("[RAGON_01_V2] 요청하신 7가지 신규 기능 탑재 패치 완료!")
