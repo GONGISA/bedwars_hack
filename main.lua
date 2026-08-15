@@ -638,4 +638,304 @@ end
 
 bedGenBtn.MouseButton1Click:Connect(function()
     bedGenActive = not bedGenActive
-    setBtnState(bedGenBtn, bedGenActive
+    setBtnState(bedGenBtn, bedGenActive, "Bed & Gen ESP (침대/생성기)")
+    if bedGenActive then
+        task.spawn(function()
+            while bedGenActive do updateBedGenESP() task.wait(2.0) end
+        end)
+    else
+        removeBedGenESP()
+    end
+end)
+
+-- ========================================================
+-- 6. Scaffold (Auto Bridge - 버그 수정완료)
+-- ========================================================
+local scaffoldActive, scaffoldConn = false, nil
+scaffoldBtn.MouseButton1Click:Connect(function()
+    scaffoldActive = not scaffoldActive
+    setBtnState(scaffoldBtn, scaffoldActive, "Scaffold (Auto Bridge)")
+    if scaffoldActive then
+        scaffoldConn = RunService.Heartbeat:Connect(function()
+            if isMyCharAlive() then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local underPos = hrp.Position - Vector3.new(0, 3.5, 0)
+                
+                -- 발 아래 레이캐스트 체크
+                local ray = workspace:Raycast(hrp.Position, Vector3.new(0, -4, 0))
+                if not ray then
+                    local blockItem = getBlockItem()
+                    if blockItem then
+                        pcall(function()
+                            local netManaged = ReplicatedStorage:FindFirstChild("rbxts_include")
+                            if netManaged then
+                                local placeNet = netManaged.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("PlaceBlock")
+                                if placeNet then
+                                    local gridPos = Vector3.new(math.floor(underPos.X / 3), math.floor(underPos.Y / 3), math.floor(underPos.Z / 3))
+                                    placeNet:FireServer({
+                                        ["position"] = gridPos,
+                                        ["blockType"] = blockItem.Name
+                                    })
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+    else
+        if scaffoldConn then scaffoldConn:Disconnect() scaffoldConn = nil end
+    end
+end)
+
+-- ========================================================
+-- 7. Bed Nuker (자동 침대 파괴 - 로직 교체 및 작동 수정)
+-- ========================================================
+local bedNukerActive = false
+bedNukerBtn.MouseButton1Click:Connect(function()
+    bedNukerActive = not bedNukerActive
+    setBtnState(bedNukerBtn, bedNukerActive, "Bed Nuker (자동 침대 파괴)")
+    if bedNukerActive then
+        task.spawn(function()
+            while bedNukerActive do
+                if isMyCharAlive() then
+                    pcall(function()
+                        local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+                        for _, obj in ipairs(workspace:GetDescendants()) do
+                            if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "bed") and not string.find(string.lower(obj.Name), "bedroom") then
+                                if (obj.Position - myPos).Magnitude <= 16 then
+                                    local netManaged = ReplicatedStorage:FindFirstChild("rbxts_include")
+                                    if netManaged then
+                                        local damageNet = netManaged.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("DamageBlock")
+                                        if damageNet then
+                                            local blockPos = Vector3.new(math.floor(obj.Position.X/3), math.floor(obj.Position.Y/3), math.floor(obj.Position.Z/3))
+                                            damageNet:InvokeServer({
+                                                ["blockRef"] = { ["blockPosition"] = blockPos },
+                                                ["hitPosition"] = obj.Position,
+                                                ["hitNormal"] = Vector3.new(0, 1, 0)
+                                            })
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+-- ========================================================
+-- 8. Auto Weapon Switch
+-- ========================================================
+local autoWeaponActive, autoWeaponConn = false, nil
+autoWeaponBtn.MouseButton1Click:Connect(function()
+    autoWeaponActive = not autoWeaponActive
+    setBtnState(autoWeaponBtn, autoWeaponActive, "Auto Weapon Switch")
+    if autoWeaponActive then
+        autoWeaponConn = RunService.RenderStepped:Connect(function()
+            if isMyCharAlive() then
+                local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+                local enemyNear = false
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
+                        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                            if (p.Character.HumanoidRootPart.Position - myPos).Magnitude <= 18 then enemyNear = true break end
+                        end
+                    end
+                end
+                if enemyNear then
+                    local bestSword = getBestSword()
+                    if bestSword and LocalPlayer.Character:FindFirstChildOfClass("Tool") ~= bestSword then
+                        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then hum:EquipTool(bestSword) end
+                    end
+                end
+            end
+        end)
+    else
+        if autoWeaponConn then autoWeaponConn:Disconnect() autoWeaponConn = nil end
+    end
+end)
+
+-- ========================================================
+-- 9. Reach Multiplier & KillAura (사거리 15, 공속 0.03초)
+-- ========================================================
+local reachActive = false
+reachBtn.MouseButton1Click:Connect(function()
+    reachActive = not reachActive
+    setBtnState(reachBtn, reachActive, "Reach Multiplier (15 Studs)")
+end)
+
+local killauraActive = false
+killauraBtn.MouseButton1Click:Connect(function()
+    killauraActive = not killauraActive
+    setBtnState(killauraBtn, killauraActive, "KillAura (자동 공격)")
+    if killauraActive then
+        task.spawn(function()
+            while killauraActive do
+                if isMyCharAlive() then
+                    local currentReach = 15 -- 사용자 요청: 사거리 15
+                    local sword = getBestSword()
+                    local net = ReplicatedStorage:FindFirstChild("rbxts_include")
+                    if net then net = net.node_modules["@rbxts"].net.out._NetManaged:FindFirstChild("SwordHit") end
+
+                    if sword and net then
+                        for _, p in pairs(Players:GetPlayers()) do
+                            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                                if pHum and pHum.Health > 0 then
+                                    local pPos = p.Character.HumanoidRootPart.Position
+                                    local lpPos = LocalPlayer.Character.HumanoidRootPart.Position
+                                    if (pPos - lpPos).Magnitude <= currentReach and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
+                                        net:FireServer({
+                                            [1] = {
+                                                ["entityInstance"] = p.Character,
+                                                ["chargedAttack"] = { ["chargeRatio"] = 0 },
+                                                ["validate"] = { ["targetPosition"] = { ["value"] = pPos }, ["selfPosition"] = { ["value"] = lpPos } },
+                                                ["weapon"] = sword
+                                            }
+                                        })
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.03) -- 사용자 요청: 공속 0.03초
+            end
+        end)
+    end
+end)
+
+-- ========================================================
+-- 10. 이동 / 유틸리티
+-- ========================================================
+local antiKbActive, antiKbConn = false, nil
+antiKbBtn.MouseButton1Click:Connect(function()
+    antiKbActive = not antiKbActive
+    setBtnState(antiKbBtn, antiKbActive, "Anti Knockback (넉백 무시)")
+    if antiKbActive then
+        antiKbConn = RunService.Heartbeat:Connect(function()
+            if isMyCharAlive() then
+                local vel = LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity
+                if math.abs(vel.X) > 25 or math.abs(vel.Z) > 25 then
+                    LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
+                end
+            end
+        end)
+    else
+        if antiKbConn then antiKbConn:Disconnect() antiKbConn = nil end
+    end
+end)
+
+local noFallActive, noFallConn = false, nil
+noFallBtn.MouseButton1Click:Connect(function()
+    noFallActive = not noFallActive
+    setBtnState(noFallBtn, noFallActive, "No Fall Damage (낙사 방지)")
+    if noFallActive then
+        noFallConn = RunService.RenderStepped:Connect(function()
+            if isMyCharAlive() then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                if hrp.AssemblyLinearVelocity.Y < -35 and workspace:Raycast(hrp.Position, Vector3.new(0, -12, 0)) then
+                    hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, -5, hrp.AssemblyLinearVelocity.Z)
+                end
+            end
+        end)
+    else
+        if noFallConn then noFallConn:Disconnect() noFallConn = nil end
+    end
+end)
+
+local sprintActive, sprintConn = false, nil
+sprintBtn.MouseButton1Click:Connect(function()
+    sprintActive = not sprintActive
+    setBtnState(sprintBtn, sprintActive, "Auto Sprint (자동 달리기)")
+    if sprintActive then
+        sprintConn = RunService.RenderStepped:Connect(function()
+            if isMyCharAlive() then
+                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.WalkSpeed < 22 then hum.WalkSpeed = 22 end
+            end
+        end)
+    else
+        if sprintConn then sprintConn:Disconnect() sprintConn = nil end
+    end
+end)
+
+local spiderActive, spiderConn = false, nil
+spiderBtn.MouseButton1Click:Connect(function()
+    spiderActive = not spiderActive
+    setBtnState(spiderBtn, spiderActive, "Spider (벽 타기)")
+    if spiderActive then
+        spiderConn = RunService.RenderStepped:Connect(function()
+            if isMyCharAlive() then
+                local char = LocalPlayer.Character
+                local hrp = char.HumanoidRootPart
+                local ray = workspace:Raycast(hrp.Position, hrp.CFrame.LookVector * 2.5)
+                if ray and ray.Instance and ray.Instance.CanCollide and char.Humanoid.MoveDirection.Magnitude > 0 then
+                    hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 25, hrp.AssemblyLinearVelocity.Z)
+                end
+            end
+        end)
+    else
+        if spiderConn then spiderConn:Disconnect() spiderConn = nil end
+    end
+end)
+
+local aimbotActive, aimbotConn = false, nil
+aimbotBtn.MouseButton1Click:Connect(function()
+    aimbotActive = not aimbotActive
+    setBtnState(aimbotBtn, aimbotActive, "Aimbot (RMB Hold)")
+    if aimbotActive then
+        aimbotConn = RunService.RenderStepped:Connect(function()
+            local rmbPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+            if rmbPressed and isMyCharAlive() then
+                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool and (string.find(string.lower(tool.Name), "bow") or string.find(string.lower(tool.Name), "crossbow")) then
+                    local closestHead = nil
+                    local shortestDist = math.huge
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
+                            if p.Character and p.Character:FindFirstChild("Head") then
+                                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.Head.Position).Magnitude
+                                    if dist < shortestDist then shortestDist = dist closestHead = p.Character.Head end
+                                end
+                            end
+                        end
+                    end
+                    if closestHead then
+                        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestHead.Position + Vector3.new(0, shortestDist*0.08, 0))
+                    end
+                end
+            end
+        end)
+    else
+        if aimbotConn then aimbotConn:Disconnect() aimbotConn = nil end
+    end
+end)
+
+-- ========================================================
+-- 11. 최적화
+-- ========================================================
+local fpsBoostActive = false
+fpsBoostBtn.MouseButton1Click:Connect(function()
+    fpsBoostActive = not fpsBoostActive
+    setBtnState(fpsBoostBtn, fpsBoostActive, "FPS Boost (렉제거 & 최적화)")
+    if fpsBoostActive then
+        pcall(function()
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Enabled = false end
+            end
+        end)
+    end
+end)
+
+print("[RAGON_01] 기능 및 버그 수정 패치 적용 완료!")
