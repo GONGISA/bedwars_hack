@@ -3,20 +3,20 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
--- 디스코드 링크 클립보드 복사 (실행 환경에 따라 지원 안 할 수 있어 pcall 처리)
+-- 디스코드 링크 클립보드 복사
 pcall(function()
     if setclipboard then
         setclipboard('https://discord.gg/VudXCDCaBN')
     end
 end)
 
--- UI 생성 (CoreGui 지원 안 될 시 PlayerGui 사용)
+-- UI 컨테이너 설정
 local parentContainer = game:GetService("CoreGui")
 if not pcall(function() local _ = parentContainer.Name end) then
     parentContainer = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- 기존 UI가 있다면 삭제
+-- 기존 UI 제거
 if parentContainer:FindFirstChild("RAGON_01_UI") then
     parentContainer.RAGON_01_UI:Destroy()
 end
@@ -34,14 +34,14 @@ frame.Position = UDim2.new(0.05, 0, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true -- UI 마우스 드래그 이동 가능
+frame.Draggable = true
 frame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
--- 타이틀 (RAGON_01 로 변경 완료)
+-- 타이틀
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundTransparency = 1
@@ -51,12 +51,12 @@ title.TextSize = 18
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
--- 버튼 생성용 도우미 함수
+-- 버튼 생성 함수
 local function createButton(name, posY)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.85, 0, 0, 40)
     btn.Position = UDim2.new(0.075, 0, 0, posY)
-    btn.BackgroundColor3 = Color3.fromRGB(220, 60, 60) -- 초기 상태: 빨간색 (OFF)
+    btn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
     btn.Text = name .. " [OFF]"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.TextSize = 14
@@ -75,57 +75,67 @@ local spiderBtn = createButton("Spider", 100)
 local killauraBtn = createButton("KillAura", 150)
 
 -- ========================================================
--- 1. ESP 기능 구현 (Toggle)
+-- 1. ESP 기능 (상시 유지 루프 적용 - 피격/부활 시 자동 재적용)
 -- ========================================================
 local espActive = false
-local espConnections = {}
 
-local function removeESP(player)
-    if player.Character and player.Character:FindFirstChild("TestESP") then
-        player.Character.TestESP:Destroy()
+local function removeAllESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("TestESP") then
+            p.Character.TestESP:Destroy()
+        end
     end
 end
 
-local function applyESP(player)
-    if player == LocalPlayer then return end
-    
-    local function setup(char)
-        if not espActive then return end
-        if char:FindFirstChild("TestESP") then return end
-        local hl = Instance.new("Highlight")
-        hl.Name = "TestESP"
-        hl.Adornee = char
-        hl.FillColor = Color3.fromRGB(255, 50, 50)
-        hl.FillTransparency = 0.5
-        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Parent = char
+local function updateESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local char = p.Character
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            
+            if hum and hum.Health > 0 then
+                -- Highlight가 없으면 생성 (피격이나 데미지 효과로 지워져도 0.2초 내로 자동 재생성)
+                if not char:FindFirstChild("TestESP") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "TestESP"
+                    hl.Adornee = char
+                    hl.FillColor = Color3.fromRGB(255, 50, 50)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = char
+                end
+            else
+                if char:FindFirstChild("TestESP") then
+                    char.TestESP:Destroy()
+                end
+            end
+        end
     end
-
-    if player.Character then setup(player.Character) end
-    local conn = player.CharacterAdded:Connect(setup)
-    table.insert(espConnections, conn)
 end
 
 espBtn.MouseButton1Click:Connect(function()
     espActive = not espActive
     if espActive then
-        espBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113) -- 초록색 (ON)
+        espBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
         espBtn.Text = "ESP [ON]"
-        for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
-        local conn = Players.PlayerAdded:Connect(applyESP)
-        table.insert(espConnections, conn)
+        
+        -- ESP 지속 유지 루프 실행
+        task.spawn(function()
+            while espActive do
+                updateESP()
+                task.wait(0.2)
+            end
+        end)
     else
-        espBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60) -- 빨간색 (OFF)
+        espBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
         espBtn.Text = "ESP [OFF]"
-        for _, conn in ipairs(espConnections) do conn:Disconnect() end
-        espConnections = {}
-        for _, p in ipairs(Players:GetPlayers()) do removeESP(p) end
+        removeAllESP()
     end
 end)
 
 -- ========================================================
--- 2. Spider (벽타기) 기능 구현 (Toggle)
+-- 2. Spider (벽타기)
 -- ========================================================
 local spiderActive = false
 local spiderConnection = nil
@@ -171,10 +181,10 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 3. Bedwars KillAura (제시해주신 로직 통합)
+-- 3. Bedwars KillAura (사거리 35 상향 확장)
 -- ========================================================
 local killauraActive = false
-local range = 20
+local range = 35 -- 사거리 20 -> 35 확장
 
 local function getSword()
     local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
@@ -196,7 +206,6 @@ killauraBtn.MouseButton1Click:Connect(function()
         killauraBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
         killauraBtn.Text = "KillAura [ON]"
 
-        -- 루프 동작 (토글이 켜져 있을 때만 작동)
         task.spawn(function()
             while killauraActive do
                 local sword = getSword()
@@ -211,7 +220,6 @@ killauraBtn.MouseButton1Click:Connect(function()
                             local pPos = p.Character.HumanoidRootPart.Position
                             local lpPos = LocalPlayer.Character.HumanoidRootPart.Position
                             
-                            -- 사거리 측정 및 팀 확인
                             if dist(lpPos, pPos) <= range and p.Team ~= LocalPlayer.Team then
                                 local args = {
                                     [1] = {
@@ -235,7 +243,7 @@ killauraBtn.MouseButton1Click:Connect(function()
                         end
                     end
                 end
-                task.wait(0.07)
+                task.wait(0.05)
             end
         end)
     else
@@ -244,4 +252,4 @@ killauraBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] 패널이 성공적으로 로드되었습니다.")
+print("[RAGON_01] 업데이트 완료.")
