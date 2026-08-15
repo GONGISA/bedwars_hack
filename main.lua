@@ -25,7 +25,7 @@ end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RAGON_01_UI"
-screenGui.ResetOnSpawn = false
+screenGui.ResetOnSpawn = false -- 리스폰 시 UI 유지
 screenGui.Parent = parentContainer
 
 -- 메인 프레임
@@ -78,6 +78,15 @@ local sprintBtn = createButton("Auto Sprint", 130)
 local spiderBtn = createButton("Spider", 175)
 local killauraBtn = createButton("KillAura", 220)
 local aimbotBtn = createButton("Aimbot", 265)
+
+-- 내 캐릭터 생존 확인 함수
+local function isMyCharAlive()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    return hum and hum.Health > 0 and hrp ~= nil
+end
 
 -- ========================================================
 -- 1. ESP 기능
@@ -243,9 +252,8 @@ sprintBtn.MouseButton1Click:Connect(function()
         sprintBtn.Text = "Auto Sprint [ON]"
         
         sprintConnection = RunService.RenderStepped:Connect(function()
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
+            if isMyCharAlive() then
+                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.WalkSpeed < SPRINT_SPEED then
                     hum.WalkSpeed = SPRINT_SPEED
                 end
@@ -258,9 +266,8 @@ sprintBtn.MouseButton1Click:Connect(function()
             sprintConnection:Disconnect()
             sprintConnection = nil
         end
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
+        if isMyCharAlive() then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
     end
@@ -283,11 +290,10 @@ spiderBtn.MouseButton1Click:Connect(function()
         spiderBtn.Text = "Spider [ON]"
         
         spiderConnection = RunService.RenderStepped:Connect(function()
+            if not isMyCharAlive() then return end
             local char = LocalPlayer.Character
-            if not char then return end
             local hrp = char:FindFirstChild("HumanoidRootPart")
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if not hrp or not hum then return end
 
             rayParams.FilterDescendantsInstances = {char}
             local rayResult = workspace:Raycast(hrp.Position, hrp.CFrame.LookVector * RAY_DIST, rayParams)
@@ -313,10 +319,10 @@ spiderBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 5. Bedwars KillAura (사거리 14 수정 완료)
+-- 5. Bedwars KillAura (사망 시 일시 정지 후 리스폰 시 자동 재개)
 -- ========================================================
 local killauraActive = false
-local range = 14 -- 기존 35에서 14로 변경
+local range = 14
 
 local function getSword()
     local inv = ReplicatedStorage.Inventories:FindFirstChild(LocalPlayer.Name)
@@ -340,37 +346,36 @@ killauraBtn.MouseButton1Click:Connect(function()
 
         task.spawn(function()
             while killauraActive do
-                local sword = getSword()
-                local net = ReplicatedStorage.rbxts_include.node_modules:FindFirstChild("@rbxts")
-                if net then
-                    net = net.net.out._NetManaged:FindFirstChild("SwordHit")
-                end
+                if isMyCharAlive() then
+                    local sword = getSword()
+                    local net = ReplicatedStorage.rbxts_include.node_modules:FindFirstChild("@rbxts")
+                    if net then
+                        net = net.net.out._NetManaged:FindFirstChild("SwordHit")
+                    end
 
-                if sword and net then
-                    for _, p in pairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            local pPos = p.Character.HumanoidRootPart.Position
-                            local lpPos = LocalPlayer.Character.HumanoidRootPart.Position
-                            
-                            if dist(lpPos, pPos) <= range and p.Team ~= LocalPlayer.Team then
-                                local args = {
-                                    [1] = {
-                                        ["entityInstance"] = p.Character,
-                                        ["chargedAttack"] = {
-                                            ["chargeRatio"] = 0
-                                        },
-                                        ["validate"] = {
-                                            ["targetPosition"] = {
-                                                ["value"] = pPos
-                                            },
-                                            ["selfPosition"] = {
-                                                ["value"] = lpPos
+                    if sword and net then
+                        for _, p in pairs(Players:GetPlayers()) do
+                            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                                if pHum and pHum.Health > 0 then
+                                    local pPos = p.Character.HumanoidRootPart.Position
+                                    local lpPos = LocalPlayer.Character.HumanoidRootPart.Position
+                                    
+                                    if dist(lpPos, pPos) <= range and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team) then
+                                        local args = {
+                                            [1] = {
+                                                ["entityInstance"] = p.Character,
+                                                ["chargedAttack"] = { ["chargeRatio"] = 0 },
+                                                ["validate"] = {
+                                                    ["targetPosition"] = { ["value"] = pPos },
+                                                    ["selfPosition"] = { ["value"] = lpPos }
+                                                },
+                                                ["weapon"] = sword
                                             }
-                                        },
-                                        ["weapon"] = sword
-                                    }
-                                }
-                                net:FireServer(unpack(args))
+                                        }
+                                        net:FireServer(unpack(args))
+                                    end
+                                end
                             end
                         end
                     end
@@ -385,7 +390,7 @@ killauraBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- 6. 원거리 무기 Aimbot (낙차 보정 포함)
+-- 6. 원거리 무기 Aimbot
 -- ========================================================
 local aimbotActive = false
 local aimbotConnection = nil
@@ -396,8 +401,8 @@ local PROJECTILE_SPEED = 240
 local GRAVITY = workspace.Gravity
 
 local function isHoldingRangedWeapon()
+    if not isMyCharAlive() then return false end
     local char = LocalPlayer.Character
-    if not char then return false end
     
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
@@ -437,8 +442,8 @@ end
 local function getClosestVisibleEnemy()
     local closestHead = nil
     local shortestDist = math.huge
-    local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myHrp then return nil end
+    if not isMyCharAlive() then return nil end
+    local myHrp = LocalPlayer.Character.HumanoidRootPart
 
     for _, p in ipairs(Players:GetPlayers()) do
         local isEnemy = (p ~= LocalPlayer) and (not p.Team or not LocalPlayer.Team or p.Team ~= LocalPlayer.Team)
@@ -492,4 +497,4 @@ aimbotBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[RAGON_01] KillAura 사거리 14로 수정 완료.")
+print("[RAGON_01] 리스폰 자동 유지 기능 적용 완료.")
